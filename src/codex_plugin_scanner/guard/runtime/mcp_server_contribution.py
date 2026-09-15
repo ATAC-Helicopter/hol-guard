@@ -99,8 +99,6 @@ def normalized_remote_mcp_url(value: object) -> str | None:
         host = str(address)
     netloc = f"[{host}]" if ":" in host else host
     path = parsed.path or "/"
-    if path != "/":
-        path = path.rstrip("/") or "/"
     return urlunsplit(("https", netloc, path, parsed.query, ""))
 
 
