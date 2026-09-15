@@ -27,100 +27,124 @@ jobs:
       - uses: astral-sh/setup-uv@e92bafb6253dcd438e0484186d7669ea7a8ca1cc
         with:
           version: '0.8.15'
-      - name: Patch hosted MCP policy closure
+      - name: Patch hosted MCP policy source
         shell: bash
         run: |
           python3 - <<'PY'
           from pathlib import Path
 
-          def replace(path: str, old: str, new: str, count: int = 1) -> None:
+          def ensure_replace(path: str, old: str, new: str) -> None:
               p = Path(path)
               text = p.read_text(encoding='utf-8')
-              if text.count(old) != count:
-                  raise SystemExit(f'unexpected replacement count in {path}: {old!r} -> {text.count(old)}')
-              p.write_text(text.replace(old, new, count), encoding='utf-8')
+              if new in text:
+                  return
+              if old not in text:
+                  raise SystemExit(f'missing expected source in {path}')
+              p.write_text(text.replace(old, new, 1), encoding='utf-8')
 
-          replace(
+          ensure_replace(
               'src/codex_plugin_scanner/guard/mcp_tool_calls.py',
               'if granted is not None and (granted[0] == "block" or current.action != "allow"):',
               'if granted is not None and (granted[0] in {"block", "review"} or current.action != "allow"):',
           )
-          replace(
+          ensure_replace(
               'src/codex_plugin_scanner/guard/local_cli_trust.py',
               'if current_action not in {"review", "require-reapproval", "warn"}:',
               'if current_action not in {"allow", "review", "require-reapproval", "warn"}:',
           )
-          replace(
+          ensure_replace(
               'src/codex_plugin_scanner/guard/runtime/mcp_server_contribution.py',
-              '''def normalized_remote_server_name(value: object) -> str | None:\n''',
-              '''def remote_mcp_endpoint_identity(value: object) -> str | None:\n    normalized = normalized_remote_mcp_url(value)\n    if normalized is None:\n        return None\n    return normalized.partition("?")[0]\n\n\ndef normalized_remote_server_name(value: object) -> str | None:\n''',
+              'def normalized_remote_server_name(value: object) -> str | None:\n',
+              'def remote_mcp_endpoint_identity(value: object) -> str | None:\n    normalized = normalized_remote_mcp_url(value)\n    if normalized is None:\n        return None\n    return normalized.partition("?")[0]\n\n\ndef normalized_remote_server_name(value: object) -> str | None:\n',
           )
-          replace(
+          ensure_replace(
               'src/codex_plugin_scanner/guard/runtime/mcp_server_contribution.py',
-              '''        remote_url = normalized_remote_mcp_url(launch.get("url"))\n        if remote_url is None:\n            raise ValueError(f"{mcp_id} is missing a valid remote URL")\n        previous_url = remote_urls.get(remote_url)\n        if previous_url is not None:\n            raise ValueError(f"duplicate MCP remote URL {remote_url} for {previous_url} and {mcp_id}")\n        remote_urls[remote_url] = mcp_id\n''',
-              '''        remote_url = normalized_remote_mcp_url(launch.get("url"))\n        if remote_url is None:\n            raise ValueError(f"{mcp_id} is missing a valid remote URL")\n        remote_endpoint = remote_mcp_endpoint_identity(remote_url)\n        if remote_endpoint is None:\n            raise ValueError(f"{mcp_id} is missing a valid remote endpoint")\n        previous_url = remote_urls.get(remote_endpoint)\n        if previous_url is not None:\n            raise ValueError(f"duplicate MCP remote endpoint {remote_endpoint} for {previous_url} and {mcp_id}")\n        remote_urls[remote_endpoint] = mcp_id\n''',
+              '        previous_url = remote_urls.get(remote_url)\n        if previous_url is not None:\n            raise ValueError(f"duplicate MCP remote URL {remote_url} for {previous_url} and {mcp_id}")\n        remote_urls[remote_url] = mcp_id\n',
+              '        remote_endpoint = remote_mcp_endpoint_identity(remote_url)\n        if remote_endpoint is None:\n            raise ValueError(f"{mcp_id} is missing a valid remote endpoint")\n        previous_url = remote_urls.get(remote_endpoint)\n        if previous_url is not None:\n            raise ValueError(f"duplicate MCP remote endpoint {remote_endpoint} for {previous_url} and {mcp_id}")\n        remote_urls[remote_endpoint] = mcp_id\n',
           )
-          replace(
+          ensure_replace(
               'src/codex_plugin_scanner/guard/runtime/mcp_server_grants.py',
-              '''    normalized_remote_mcp_url,\n    normalized_remote_server_name,\n''',
-              '''    normalized_remote_mcp_url,\n    normalized_remote_server_name,\n    remote_mcp_endpoint_identity,\n''',
+              '    normalized_remote_mcp_url,\n    normalized_remote_server_name,\n',
+              '    normalized_remote_mcp_url,\n    normalized_remote_server_name,\n    remote_mcp_endpoint_identity,\n',
           )
-          replace(
+          ensure_replace(
               'src/codex_plugin_scanner/guard/runtime/mcp_server_grants.py',
-              '''    remote_url = normalized_remote_mcp_url(launch.get("url"))\n    if remote_url is None:\n        return False\n    remote_endpoint = remote_url.partition("?")[0]\n    identity_command_value = _mcp_identity_command(artifact)\n    if identity_command_value is not None:\n        identity_command = normalized_remote_mcp_url(identity_command_value)\n        if identity_command is None:\n            return False\n        return identity_command.partition("?")[0] == remote_endpoint\n''',
-              '''    remote_endpoint = remote_mcp_endpoint_identity(launch.get("url"))\n    if remote_endpoint is None:\n        return False\n    identity_command_value = _mcp_identity_command(artifact)\n    if identity_command_value is not None:\n        identity_endpoint = remote_mcp_endpoint_identity(identity_command_value)\n        if identity_endpoint is None:\n            return False\n        return identity_endpoint == remote_endpoint\n''',
-          )
-          replace(
-              'tests/test_guard_remote_mcp_contributions.py',
-              'from __future__ import annotations\n\nfrom pathlib import Path\n',
-              'from __future__ import annotations\n\nimport json\nfrom pathlib import Path\n',
-          )
-          replace(
-              'tests/test_guard_remote_mcp_contributions.py',
-              'from codex_plugin_scanner.guard.mcp_tool_calls import build_tool_call_artifact\n',
-              '''from codex_plugin_scanner.guard.mcp_tool_calls import (\n    ToolCallDecision,\n    _apply_temporary_mcp_grant,\n    build_tool_call_artifact,\n)\n''',
-          )
-          replace(
-              'tests/test_guard_remote_mcp_contributions.py',
-              '''    normalized_remote_mcp_url,\n    validate_mcp_contribution,\n''',
-              '''    load_mcp_contribution_payloads,\n    normalized_remote_mcp_url,\n    validate_mcp_contribution,\n''',
-          )
-          replace(
-              'tests/test_guard_remote_mcp_contributions.py',
-              '''def test_remote_instapods_review_default_strengthens_allow() -> None:\n    decision = apply_contributed_mcp_decision(_AuthorityStore(), _remote_artifact("change_plan"), "allow")\n    assert decision is not None\n    assert decision[0] == "review"\n    assert decision[1] == "catalog-mcp-extension"\n\n\n''',
-              '''def test_remote_instapods_review_default_strengthens_allow() -> None:\n    decision = apply_contributed_mcp_decision(_AuthorityStore(), _remote_artifact("change_plan"), "allow")\n    assert decision is not None\n    assert decision[0] == "review"\n    assert decision[1] == "catalog-mcp-extension"\n\n\ndef test_remote_instapods_review_default_strengthens_allow_in_runtime_path() -> None:\n    current = ToolCallDecision(\n        action="allow",\n        source="base-policy",\n        signals=(),\n        summary="Allowed by base policy.",\n    )\n    decision = _apply_temporary_mcp_grant(\n        store=_AuthorityStore(),\n        artifact=_remote_artifact("change_plan"),\n        artifact_hash="test-hash",\n        arguments={},\n        current=current,\n    )\n    assert decision.action == "review"\n    assert decision.source == "catalog-mcp-extension"\n\n\n''',
-          )
-          replace(
-              'tests/test_guard_remote_mcp_contributions.py',
-              '''def test_remote_http_contribution_rejects_allow_default() -> None:\n''',
-              '''def test_remote_http_contributions_reject_query_identity_collisions(tmp_path: Path) -> None:\n    alpha = _remote_payload("https://example.test/mcp?tenant=alpha")\n    alpha["id"] = "mcp.query-alpha"\n    alpha_launch = alpha["launch"]\n    assert isinstance(alpha_launch, dict)\n    alpha_launch["serverNames"] = ["query-alpha"]\n    beta = _remote_payload("https://example.test/mcp?tenant=beta")\n    beta["id"] = "mcp.query-beta"\n    beta_launch = beta["launch"]\n    assert isinstance(beta_launch, dict)\n    beta_launch["serverNames"] = ["query-beta"]\n    (tmp_path / "mcp.query-alpha.json").write_text(json.dumps(alpha), encoding="utf-8")\n    (tmp_path / "mcp.query-beta.json").write_text(json.dumps(beta), encoding="utf-8")\n\n    with pytest.raises(ValueError, match="duplicate MCP remote endpoint"):\n        load_mcp_contribution_payloads(tmp_path)\n\n\ndef test_remote_http_contribution_rejects_allow_default() -> None:\n''',
-          )
-          replace(
-              'tests/test_guard_mcp_server_grants.py',
-              '''def test_evaluate_write_file_blocks_after_local_enable(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:\n''',
-              '''def test_custom_mcp_block_overrides_base_allow(tmp_path: Path) -> None:\n    identity = _identity()\n    store = GuardStore(tmp_path / "guard-home")\n    cli_identity = UnlistedCliIdentity(\n        cli_id=f"local-cli.mcp-{identity.identity_hash[:8]}",\n        name=identity.package_name or "mcp-server",\n        kind="executable",\n        identity_hash=identity.identity_hash,\n        example_label="npx -y @modelcontextprotocol/server-filesystem",\n    )\n    store.record_local_cli_observation(\n        cli_identity,\n        seen_at=utc_now(),\n        surface="mcp",\n        server_identity_hash=identity.identity_hash,\n        server_command=identity.command,\n        server_args_hash=identity.args_hash,\n        help_status="ok",\n    )\n    store.replace_local_cli_commands(\n        cli_identity.cli_id,\n        (LocalCliCommand("write_file", "write_file", "write_file", "Write a file"),),\n    )\n    store.upsert_local_cli_grant(\n        identity=cli_identity,\n        state="allowed",\n        expected_revision=0,\n        updated_at=utc_now(),\n        command_states={"write_file": "block"},\n    )\n    artifact = _artifact(identity, "write_file")\n    granted = apply_local_mcp_extension_decision(store, artifact, "allow")\n    assert granted is not None\n    assert granted[0] == "block"\n    assert granted[1] == "local-mcp-extension"\n\n\ndef test_evaluate_write_file_blocks_after_local_enable(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:\n''',
+              '    remote_url = normalized_remote_mcp_url(launch.get("url"))\n    if remote_url is None:\n        return False\n    remote_endpoint = remote_url.partition("?")[0]\n    identity_command_value = _mcp_identity_command(artifact)\n    if identity_command_value is not None:\n        identity_command = normalized_remote_mcp_url(identity_command_value)\n        if identity_command is None:\n            return False\n        return identity_command.partition("?")[0] == remote_endpoint\n',
+              '    remote_endpoint = remote_mcp_endpoint_identity(launch.get("url"))\n    if remote_endpoint is None:\n        return False\n    identity_command_value = _mcp_identity_command(artifact)\n    if identity_command_value is not None:\n        identity_endpoint = remote_mcp_endpoint_identity(identity_command_value)\n        if identity_endpoint is None:\n            return False\n        return identity_endpoint == remote_endpoint\n',
           )
           PY
       - run: uv sync --frozen --extra dev --python 3.12
-      - name: Format focused changes
+      - name: Format source changes
         run: |
-          uv run ruff check --fix src/codex_plugin_scanner/guard/mcp_tool_calls.py src/codex_plugin_scanner/guard/local_cli_trust.py src/codex_plugin_scanner/guard/runtime/mcp_server_contribution.py src/codex_plugin_scanner/guard/runtime/mcp_server_grants.py tests/test_guard_remote_mcp_contributions.py tests/test_guard_mcp_server_grants.py
-          uv run ruff format src/codex_plugin_scanner/guard/mcp_tool_calls.py src/codex_plugin_scanner/guard/local_cli_trust.py src/codex_plugin_scanner/guard/runtime/mcp_server_contribution.py src/codex_plugin_scanner/guard/runtime/mcp_server_grants.py tests/test_guard_remote_mcp_contributions.py tests/test_guard_mcp_server_grants.py
-      - name: Run focused tests
-        run: uv run pytest -q tests/test_guard_remote_mcp_contributions.py tests/test_guard_mcp_server_grants.py
-      - name: Verify focused lint
-        run: |
-          uv run ruff check src/codex_plugin_scanner/guard/mcp_tool_calls.py src/codex_plugin_scanner/guard/local_cli_trust.py src/codex_plugin_scanner/guard/runtime/mcp_server_contribution.py src/codex_plugin_scanner/guard/runtime/mcp_server_grants.py tests/test_guard_remote_mcp_contributions.py tests/test_guard_mcp_server_grants.py
-          uv run ruff format --check src/codex_plugin_scanner/guard/mcp_tool_calls.py src/codex_plugin_scanner/guard/local_cli_trust.py src/codex_plugin_scanner/guard/runtime/mcp_server_contribution.py src/codex_plugin_scanner/guard/runtime/mcp_server_grants.py tests/test_guard_remote_mcp_contributions.py tests/test_guard_mcp_server_grants.py
-      - name: Commit closure fix
+          uv run ruff check --fix src/codex_plugin_scanner/guard/mcp_tool_calls.py src/codex_plugin_scanner/guard/local_cli_trust.py src/codex_plugin_scanner/guard/runtime/mcp_server_contribution.py src/codex_plugin_scanner/guard/runtime/mcp_server_grants.py
+          uv run ruff format src/codex_plugin_scanner/guard/mcp_tool_calls.py src/codex_plugin_scanner/guard/local_cli_trust.py src/codex_plugin_scanner/guard/runtime/mcp_server_contribution.py src/codex_plugin_scanner/guard/runtime/mcp_server_grants.py
+      - name: Commit source closure
         shell: bash
         run: |
-          git rm .github/workflows/zz-instapods-policy-closure.yml
-          git add src/codex_plugin_scanner/guard/mcp_tool_calls.py src/codex_plugin_scanner/guard/local_cli_trust.py src/codex_plugin_scanner/guard/runtime/mcp_server_contribution.py src/codex_plugin_scanner/guard/runtime/mcp_server_grants.py tests/test_guard_remote_mcp_contributions.py tests/test_guard_mcp_server_grants.py
+          git add src/codex_plugin_scanner/guard/mcp_tool_calls.py src/codex_plugin_scanner/guard/local_cli_trust.py src/codex_plugin_scanner/guard/runtime/mcp_server_contribution.py src/codex_plugin_scanner/guard/runtime/mcp_server_grants.py
           git diff --cached --check
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git commit -m 'fix: enforce hosted MCP review policy'
           git push origin HEAD:codex/instapods-remote-mcp-extension
+      - name: Patch focused regression tests
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
 
-# rerun closure
+          def ensure_replace(path: str, old: str, new: str) -> None:
+              p = Path(path)
+              text = p.read_text(encoding='utf-8')
+              if new in text:
+                  return
+              if old not in text:
+                  raise SystemExit(f'missing expected test anchor in {path}')
+              p.write_text(text.replace(old, new, 1), encoding='utf-8')
+
+          ensure_replace(
+              'tests/test_guard_remote_mcp_contributions.py',
+              'from __future__ import annotations\n\nfrom pathlib import Path\n',
+              'from __future__ import annotations\n\nimport json\nfrom pathlib import Path\n',
+          )
+          ensure_replace(
+              'tests/test_guard_remote_mcp_contributions.py',
+              'from codex_plugin_scanner.guard.mcp_tool_calls import build_tool_call_artifact\n',
+              'from codex_plugin_scanner.guard.mcp_tool_calls import (\n    ToolCallDecision,\n    _apply_temporary_mcp_grant,\n    build_tool_call_artifact,\n)\n',
+          )
+          ensure_replace(
+              'tests/test_guard_remote_mcp_contributions.py',
+              '    normalized_remote_mcp_url,\n    validate_mcp_contribution,\n',
+              '    load_mcp_contribution_payloads,\n    normalized_remote_mcp_url,\n    validate_mcp_contribution,\n',
+          )
+          ensure_replace(
+              'tests/test_guard_remote_mcp_contributions.py',
+              'def test_remote_instapods_manage_pod_inherits() -> None:\n',
+              'def test_remote_instapods_review_default_strengthens_allow_in_runtime_path() -> None:\n    current = ToolCallDecision(\n        action="allow",\n        source="base-policy",\n        signals=(),\n        summary="Allowed by base policy.",\n    )\n    decision = _apply_temporary_mcp_grant(\n        store=_AuthorityStore(),\n        artifact=_remote_artifact("change_plan"),\n        artifact_hash="test-hash",\n        arguments={},\n        current=current,\n    )\n    assert decision.action == "review"\n    assert decision.source == "catalog-mcp-extension"\n\n\ndef test_remote_instapods_manage_pod_inherits() -> None:\n',
+          )
+          ensure_replace(
+              'tests/test_guard_remote_mcp_contributions.py',
+              'def test_remote_http_contribution_rejects_allow_default() -> None:\n',
+              'def test_remote_http_contributions_reject_query_identity_collisions(tmp_path: Path) -> None:\n    alpha = _remote_payload("https://example.test/mcp?tenant=alpha")\n    alpha["id"] = "mcp.query-alpha"\n    alpha_launch = alpha["launch"]\n    assert isinstance(alpha_launch, dict)\n    alpha_launch["serverNames"] = ["query-alpha"]\n    beta = _remote_payload("https://example.test/mcp?tenant=beta")\n    beta["id"] = "mcp.query-beta"\n    beta_launch = beta["launch"]\n    assert isinstance(beta_launch, dict)\n    beta_launch["serverNames"] = ["query-beta"]\n    (tmp_path / "mcp.query-alpha.json").write_text(json.dumps(alpha), encoding="utf-8")\n    (tmp_path / "mcp.query-beta.json").write_text(json.dumps(beta), encoding="utf-8")\n\n    with pytest.raises(ValueError, match="duplicate MCP remote endpoint"):\n        load_mcp_contribution_payloads(tmp_path)\n\n\ndef test_remote_http_contribution_rejects_allow_default() -> None:\n',
+          )
+          ensure_replace(
+              'tests/test_guard_mcp_server_grants.py',
+              'def test_evaluate_write_file_blocks_after_local_enable(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:\n',
+              'def test_custom_mcp_block_overrides_base_allow(tmp_path: Path) -> None:\n    identity = _identity()\n    store = GuardStore(tmp_path / "guard-home")\n    cli_identity = UnlistedCliIdentity(\n        cli_id=f"local-cli.mcp-{identity.identity_hash[:8]}",\n        name=identity.package_name or "mcp-server",\n        kind="executable",\n        identity_hash=identity.identity_hash,\n        example_label="npx -y @modelcontextprotocol/server-filesystem",\n    )\n    store.record_local_cli_observation(\n        cli_identity,\n        seen_at=utc_now(),\n        surface="mcp",\n        server_identity_hash=identity.identity_hash,\n        server_command=identity.command,\n        server_args_hash=identity.args_hash,\n        help_status="ok",\n    )\n    store.replace_local_cli_commands(\n        cli_identity.cli_id,\n        (LocalCliCommand("write_file", "write_file", "write_file", "Write a file"),),\n    )\n    store.upsert_local_cli_grant(\n        identity=cli_identity,\n        state="allowed",\n        expected_revision=0,\n        updated_at=utc_now(),\n        command_states={"write_file": "block"},\n    )\n    artifact = _artifact(identity, "write_file")\n    granted = apply_local_mcp_extension_decision(store, artifact, "allow")\n    assert granted is not None\n    assert granted[0] == "block"\n    assert granted[1] == "local-mcp-extension"\n\n\ndef test_evaluate_write_file_blocks_after_local_enable(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:\n',
+          )
+          PY
+      - name: Format and run focused regressions
+        run: |
+          uv run ruff check --fix tests/test_guard_remote_mcp_contributions.py tests/test_guard_mcp_server_grants.py
+          uv run ruff format tests/test_guard_remote_mcp_contributions.py tests/test_guard_mcp_server_grants.py
+          uv run pytest -q tests/test_guard_remote_mcp_contributions.py tests/test_guard_mcp_server_grants.py
+          uv run ruff check src/codex_plugin_scanner/guard/mcp_tool_calls.py src/codex_plugin_scanner/guard/local_cli_trust.py src/codex_plugin_scanner/guard/runtime/mcp_server_contribution.py src/codex_plugin_scanner/guard/runtime/mcp_server_grants.py tests/test_guard_remote_mcp_contributions.py tests/test_guard_mcp_server_grants.py
+          uv run ruff format --check src/codex_plugin_scanner/guard/mcp_tool_calls.py src/codex_plugin_scanner/guard/local_cli_trust.py src/codex_plugin_scanner/guard/runtime/mcp_server_contribution.py src/codex_plugin_scanner/guard/runtime/mcp_server_grants.py tests/test_guard_remote_mcp_contributions.py tests/test_guard_mcp_server_grants.py
+      - name: Commit regressions and remove helper
+        shell: bash
+        run: |
+          git rm .github/workflows/zz-instapods-policy-closure.yml
+          git add tests/test_guard_remote_mcp_contributions.py tests/test_guard_mcp_server_grants.py
+          git diff --cached --check
+          git commit -m 'test: cover hosted MCP policy closure'
+          git push origin HEAD:codex/instapods-remote-mcp-extension
