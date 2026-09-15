@@ -6,16 +6,16 @@ on:
       - codex/instapods-remote-mcp-extension
     paths:
       - .github/workflows/zz-instapods-regenerate.yml
-      - contracts/mcp-servers/contribution.v1.schema.json
-      - tests/test_guard_remote_mcp_contributions.py
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   regenerate:
     if: github.repository == 'hashgraph-online/hol-guard'
     runs-on: ubuntu-24.04
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
         with:
@@ -30,71 +30,126 @@ jobs:
           enable-cache: true
       - name: Install locked development environment
         run: uv sync --frozen --extra dev --python 3.13
-      - name: Teach the dashboard the remote MCP catalog shape
+      - name: Apply hosted MCP source fixes
         run: |
           python - <<'PY'
           from pathlib import Path
 
+          def replace(path: str, old: str, new: str) -> None:
+              file = Path(path)
+              text = file.read_text()
+              if old not in text:
+                  raise SystemExit(f'{path}: expected source block changed')
+              file.write_text(text.replace(old, new, 1))
+
+          replace(
+              'src/codex_plugin_scanner/guard/runtime/mcp_server_contribution.py',
+              'import json\nimport sys\n',
+              'import json\nimport sys\nfrom ipaddress import ip_address\n',
+          )
+          replace(
+              'src/codex_plugin_scanner/guard/runtime/mcp_server_contribution.py',
+              '''def normalized_remote_mcp_url(value: object) -> str | None:\n    if not isinstance(value, str) or not value.strip():\n        return None\n    try:\n        parsed = urlsplit(value.strip())\n    except ValueError:\n        return None\n    if (\n        parsed.scheme.lower() != "https"\n        or not parsed.hostname\n        or parsed.username is not None\n        or parsed.password is not None\n    ):\n        return None\n    try:\n        port = parsed.port\n    except ValueError:\n        return None\n    if port not in {None, 443}:\n        return None\n    host = parsed.hostname.lower().rstrip(".")\n    if not host:\n        return None\n    netloc = host\n    path = parsed.path or "/"\n    if path != "/":\n        path = path.rstrip("/") or "/"\n    return urlunsplit(("https", netloc, path, parsed.query, ""))\n''',
+              '''def normalized_remote_mcp_url(value: object) -> str | None:\n    if not isinstance(value, str) or not value.strip():\n        return None\n    try:\n        parsed = urlsplit(value.strip())\n    except ValueError:\n        return None\n    if (\n        parsed.scheme.lower() != "https"\n        or not parsed.hostname\n        or parsed.username is not None\n        or parsed.password is not None\n    ):\n        return None\n    try:\n        port = parsed.port\n    except ValueError:\n        return None\n    if port not in {None, 443}:\n        return None\n    host = parsed.hostname.lower().rstrip(".")\n    if not host:\n        return None\n    try:\n        address = ip_address(host)\n    except ValueError:\n        if host == "localhost" or host.endswith(".localhost") or "." not in host:\n            return None\n    else:\n        if not address.is_global:\n            return None\n    netloc = f"[{host}]" if ":" in host else host\n    path = parsed.path or "/"\n    if path != "/":\n        path = path.rstrip("/") or "/"\n    return urlunsplit(("https", netloc, path, parsed.query, ""))\n''',
+          )
+
+          replace(
+              'src/codex_plugin_scanner/guard/cli/commands_support_runtime_resolution.py',
+              'from ..runtime.mcp_protection import McpServerIdentity, build_mcp_server_identity\n',
+              'from ..runtime.mcp_protection import McpServerIdentity, build_mcp_server_identity\nfrom ..runtime.mcp_server_contribution import normalized_remote_mcp_url\n',
+          )
+          replace(
+              'src/codex_plugin_scanner/guard/cli/commands_support_runtime_resolution.py',
+              '''    remote_url = server_config.get("url") if server_config is not None else None\n    has_remote_url = isinstance(remote_url, str) and bool(remote_url.strip())\n''',
+              '''    remote_url = server_config.get("url") if server_config is not None else None\n    normalized_remote_url = normalized_remote_mcp_url(remote_url)\n    has_remote_url = normalized_remote_url is not None\n''',
+          )
+          replace(
+              'src/codex_plugin_scanner/guard/cli/commands_support_runtime_resolution.py',
+              '        command=command or ("<remote>" if has_remote_url else "<unresolved>"),\n',
+              '        command=command or (normalized_remote_url if has_remote_url else "<unresolved>"),\n',
+          )
+
+          grants = Path('src/codex_plugin_scanner/guard/runtime/mcp_server_grants.py')
+          text = grants.read_text()
+          text = text.replace('import hashlib\nimport json\n', '')
+          text = text.replace('from functools import lru_cache\n', '')
+          old = '''    observed_config_digest = _server_config_digest(artifact)\n    if observed_config_digest is not None and observed_config_digest not in _remote_config_digests(remote_url):\n        return False\n'''
+          if old not in text:
+              raise SystemExit('mcp_server_grants.py digest fallback block changed')
+          text = text.replace(old, '', 1)
+          start = text.find('\n@lru_cache(maxsize=64)\ndef _remote_config_digests')
+          end = text.find('\n\ndef _authority_layers', start)
+          if start < 0 or end < 0:
+              raise SystemExit('mcp_server_grants.py digest helpers changed')
+          text = text[:start] + text[end:]
+          start = text.find('\n\ndef _server_config_digest')
+          end = text.find('\n\ndef _mcp_identity_tool_name', start)
+          if start < 0 or end < 0:
+              raise SystemExit('mcp_server_grants.py config digest helper changed')
+          grants.write_text(text[:start] + text[end:])
+
           api = Path('dashboard/src/extension-controls-api.ts')
           text = api.read_text()
-          old = '''export type McpToolDefaultState = "inherit" | "allow" | "block";
-
-          export type McpLaunch = {
-            kind: "package-launcher";
-            command: string;
-            package: string;
-          };'''
-          new = '''export type McpToolDefaultState = "inherit" | "allow" | "review" | "block";
-
-          export type McpLaunch =
-            | {
-                kind: "package-launcher";
-                command: string;
-                package: string;
-              }
-            | {
-                kind: "remote-http";
-                url: string;
-                serverNames: string[];
-              };'''
+          old = '''export type McpToolDefaultState = "inherit" | "allow" | "block";\n\nexport type McpLaunch = {\n  kind: "package-launcher";\n  command: string;\n  package: string;\n};'''
+          new = '''export type McpToolDefaultState = "inherit" | "allow" | "review" | "block";\n\nexport type McpLaunch =\n  | {\n      kind: "package-launcher";\n      command: string;\n      package: string;\n    }\n  | {\n      kind: "remote-http";\n      url: string;\n      serverNames: string[];\n    };'''
           if old not in text:
               raise SystemExit('extension-controls-api.ts MCP type block changed')
-          api.write_text(text.replace(old, new))
+          api.write_text(text.replace(old, new, 1))
 
           normalize = Path('dashboard/src/extension-controls-normalize.ts')
           text = normalize.read_text()
-          old_launch = '''function mcpLaunch(value: unknown, label: string): McpLaunch {
-            const item = record(value, label);
-            return {
-              kind: enumValue(item.kind, `${label}.kind`, ["package-launcher"] as const),
-              command: string(item.command, `${label}.command`),
-              package: string(item.package, `${label}.package`),
-            };
-          }'''
-          new_launch = '''function mcpLaunch(value: unknown, label: string): McpLaunch {
-            const item = record(value, label);
-            const kind = enumValue(item.kind, `${label}.kind`, ["package-launcher", "remote-http"] as const);
-            if (kind === "package-launcher") {
-              return {
-                kind,
-                command: string(item.command, `${label}.command`),
-                package: string(item.package, `${label}.package`),
-              };
-            }
-            return {
-              kind,
-              url: string(item.url, `${label}.url`),
-              serverNames: stringList(item.serverNames, `${label}.serverNames`, 8),
-            };
-          }'''
+          old_launch = '''function mcpLaunch(value: unknown, label: string): McpLaunch {\n  const item = record(value, label);\n  return {\n    kind: enumValue(item.kind, `${label}.kind`, ["package-launcher"] as const),\n    command: string(item.command, `${label}.command`),\n    package: string(item.package, `${label}.package`),\n  };\n}'''
+          new_launch = '''function mcpLaunch(value: unknown, label: string): McpLaunch {\n  const item = record(value, label);\n  const kind = enumValue(item.kind, `${label}.kind`, ["package-launcher", "remote-http"] as const);\n  if (kind === "package-launcher") {\n    return {\n      kind,\n      command: string(item.command, `${label}.command`),\n      package: string(item.package, `${label}.package`),\n    };\n  }\n  return {\n    kind,\n    url: string(item.url, `${label}.url`),\n    serverNames: stringList(item.serverNames, `${label}.serverNames`, 8),\n  };\n}'''
           if old_launch not in text:
               raise SystemExit('extension-controls-normalize.ts MCP launch block changed')
-          text = text.replace(old_launch, new_launch)
+          text = text.replace(old_launch, new_launch, 1)
           old_state = 'state: enumValue(item.state, `${label}.state`, ["inherit", "allow", "block"] as const),'
           new_state = 'state: enumValue(item.state, `${label}.state`, ["inherit", "allow", "review", "block"] as const),'
           if old_state not in text:
               raise SystemExit('extension-controls-normalize.ts MCP state block changed')
-          normalize.write_text(text.replace(old_state, new_state))
+          normalize.write_text(text.replace(old_state, new_state, 1))
+
+          Path('dashboard/src/protection-center/mcp-server-defaults.tsx').write_text('''import type { ExtensionCatalogItem, McpToolDefaultState } from "../extension-controls-api";\n\nfunction toolStateLabel(state: McpToolDefaultState): string {\n  if (state === "allow") return "Allow";\n  if (state === "review") return "Review";\n  if (state === "block") return "Block";\n  return "Recommended";\n}\n\nexport function McpServerDefaults({ extension }: { extension: ExtensionCatalogItem }) {\n  if (extension.surface !== "mcp") return null;\n  const launch = extension.mcp_launch;\n  const tools = extension.mcp_tools ?? [];\n  const remoteLaunch = launch?.kind === "remote-http" ? launch : null;\n  const packageLaunch = launch?.kind === "package-launcher" ? launch : null;\n  return (\n    <article className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm lg:col-span-2" data-testid="mcp-server-defaults">\n      <h2 className="text-lg font-semibold text-brand-dark">MCP server defaults</h2>\n      <p className="mt-2 text-sm leading-6 text-brand-dark/75">\n        {remoteLaunch\n          ? "Matching hosted endpoints use these defaults after you turn the server on. A custom extension on this device still wins."\n          : "Matching launches use this package name. Defaults apply only after you turn the server on. A custom extension on this device still wins."}\n      </p>\n      <dl className="mt-5 grid gap-4 sm:grid-cols-2">\n        {remoteLaunch ? (\n          <>\n            <div>\n              <dt className="text-xs font-semibold uppercase text-brand-dark/55">Endpoint</dt>\n              <dd className="mt-1 break-all font-mono text-sm text-brand-dark">{remoteLaunch.url}</dd>\n            </div>\n            <div>\n              <dt className="text-xs font-semibold uppercase text-brand-dark/55">Server names</dt>\n              <dd className="mt-1 text-sm text-brand-dark">{remoteLaunch.serverNames.join(", ")}</dd>\n            </div>\n          </>\n        ) : (\n          <>\n            <div>\n              <dt className="text-xs font-semibold uppercase text-brand-dark/55">Launcher</dt>\n              <dd className="mt-1 text-sm text-brand-dark">{packageLaunch?.command ?? "Package launcher"}</dd>\n            </div>\n            <div>\n              <dt className="text-xs font-semibold uppercase text-brand-dark/55">Package</dt>\n              <dd className="mt-1 break-all font-mono text-sm text-brand-dark">{packageLaunch?.package ?? "Unknown package"}</dd>\n            </div>\n          </>\n        )}\n      </dl>\n      {tools.length ? (\n        <div className="mt-5 overflow-x-auto">\n          <table className="min-w-full text-left text-sm">\n            <thead className="text-xs uppercase tracking-wide text-brand-dark/55">\n              <tr>\n                <th className="pb-2 pr-4 font-semibold">Tool</th>\n                <th className="pb-2 font-semibold">Default</th>\n              </tr>\n            </thead>\n            <tbody>\n              {tools.map((tool) => (\n                <tr key={tool.name} className="border-t border-slate-100">\n                  <td className="py-2 pr-4 font-mono text-xs text-brand-dark">{tool.name}</td>\n                  <td className="py-2 text-sm text-brand-dark">{toolStateLabel(tool.state)}</td>\n                </tr>\n              ))}\n            </tbody>\n          </table>\n        </div>\n      ) : null}\n    </article>\n  );\n}\n''')
+
+          normalize_test = Path('dashboard/src/extension-controls-normalize.test.ts')
+          text = normalize_test.read_text()
+          marker = 'assert.equal(mcpCatalog.extensions[0]?.mcp_tools?.[1]?.state, "block");\n'
+          addition = '''const remoteMcpCatalog = normalizeExtensionCatalog({\n  ...catalog(),\n  extensions: [{\n    ...catalog().extensions[0],\n    extension_id: "command.mcp-instapods",\n    name: "InstaPods MCP",\n    aliases: [],\n    surface: "mcp",\n    mcp_launch: {\n      kind: "remote-http",\n      url: "https://app.instapods.com/api/mcp",\n      serverNames: ["instapods"],\n    },\n    mcp_tools: [{ name: "delete_pod", state: "review" }],\n    rules: [],\n    rule_count: 0,\n    permissions: [{\n      ...permission(),\n      permission_id: "command.mcp-instapods.permission.mcp-instapods-tool",\n      extension_id: "command.mcp-instapods",\n      rule_ids: [],\n    }],\n  }],\n});\nconst remoteLaunch = remoteMcpCatalog.extensions[0]?.mcp_launch;\nassert.equal(remoteLaunch?.kind, "remote-http");\nif (remoteLaunch?.kind === "remote-http") {\n  assert.equal(remoteLaunch.url, "https://app.instapods.com/api/mcp");\n  assert.deepEqual(remoteLaunch.serverNames, ["instapods"]);\n}\nassert.equal(remoteMcpCatalog.extensions[0]?.mcp_tools?.[0]?.state, "review");\n'''
+          if marker not in text:
+              raise SystemExit('extension-controls-normalize.test.ts MCP assertion marker changed')
+          normalize_test.write_text(text.replace(marker, marker + addition, 1))
+
+          detail_test = Path('dashboard/src/protection-center/protection-module-detail.test.tsx')
+          text = detail_test.read_text()
+          marker = 'assert.match(mcpDetail, /MCP tools available/);\n'
+          addition = '''const hostedMcp = protectionModuleFixture({\n  extension_id: "command.mcp-instapods",\n  name: "InstaPods MCP",\n  description: "Reviews sensitive hosted InstaPods MCP actions.",\n  enabled: false,\n  trust_class: "external",\n  activation: "opt-in",\n  executables: [],\n  surface: "mcp",\n  mcp_launch: {\n    kind: "remote-http",\n    url: "https://app.instapods.com/api/mcp",\n    serverNames: ["instapods"],\n  },\n  mcp_tools: [\n    { name: "delete_pod", state: "review" },\n    { name: "manage_pod", state: "inherit" },\n  ],\n});\nconst hostedMcpDetail = renderToStaticMarkup(createElement(ProtectionModuleDetail, {\n  extension: hostedMcp,\n  effective: PROTECTION_AUTHORITY_FIXTURES.protected,\n  catalogDigest: "a".repeat(64),\n  onBack: () => undefined,\n  onRefresh: () => undefined,\n  onRequestExtensionChange: () => undefined,\n}));\nassert.match(hostedMcpDetail, /https:\/\/app\.instapods\.com\/api\/mcp/);\nassert.match(hostedMcpDetail, />instapods</);\nassert.match(hostedMcpDetail, /delete_pod/);\nassert.match(hostedMcpDetail, />Review</);\n'''
+          if marker not in text:
+              raise SystemExit('protection-module-detail.test.tsx MCP marker changed')
+          detail_test.write_text(text.replace(marker, marker + addition, 1))
+
+          remote_test = Path('tests/test_guard_remote_mcp_contributions.py')
+          text = remote_test.read_text()
+          text = text.replace('import pytest\n', 'from pathlib import Path\n\nimport pytest\n', 1)
+          text = text.replace(
+              'from codex_plugin_scanner.guard.runtime.extension_control_authority import AuthorityHealth, ExtensionControlAuthorityView\n',
+              'from codex_plugin_scanner.guard.runtime.extension_control_authority import (\n    AuthorityHealth,\n    ExtensionControlAuthorityView,\n)\n',
+              1,
+          )
+          text = text.replace(
+              'from codex_plugin_scanner.guard.runtime.mcp_protection import build_mcp_server_identity\n',
+              'from codex_plugin_scanner.guard.cli.commands_support_runtime_resolution import (\n    _CopilotMcpRuntimeServer,\n    _copilot_runtime_server_identity,\n)\nfrom codex_plugin_scanner.guard.runtime.mcp_protection import build_mcp_server_identity\n',
+              1,
+          )
+          text = text.replace(
+              'with pytest.raises(ValueError, match="schema|public HTTPS endpoint"):',
+              'with pytest.raises(ValueError, match=r"schema|public HTTPS endpoint"):',
+              1,
+          )
+          marker = 'def test_remote_http_contribution_rejects_allow_default() -> None:\n'
+          addition = '''@pytest.mark.parametrize(\n    "url",\n    (\n        "https://localhost/mcp",\n        "https://127.0.0.1/mcp",\n        "https://10.0.0.1/mcp",\n        "https://[::1]/mcp",\n    ),\n)\ndef test_remote_http_url_contract_rejects_non_public_hosts(url: str) -> None:\n    with pytest.raises(ValueError, match=r"public HTTPS endpoint"):\n        validate_mcp_contribution(_remote_payload(url))\n    assert normalized_remote_mcp_url(url) is None\n\n\ndef test_remote_http_url_contract_preserves_public_ipv6_brackets() -> None:\n    url = "https://[2606:4700:4700::1111]/mcp"\n    validate_mcp_contribution(_remote_payload(url))\n    assert normalized_remote_mcp_url(url) == url\n\n\ndef test_copilot_remote_identity_matches_with_headers_and_standard_port(tmp_path: Path) -> None:\n    server = _CopilotMcpRuntimeServer(\n        server_name="instapods",\n        source_scope="project",\n        config_path=str(tmp_path / ".mcp.json"),\n        server_config={\n            "url": "https://app.instapods.com:443/api/mcp",\n            "headers": {"Authorization": "Bearer runtime-secret"},\n        },\n    )\n    identity, fingerprint, transport = _copilot_runtime_server_identity(server, launch_cwd=tmp_path)\n    assert identity.command == "https://app.instapods.com/api/mcp"\n    artifact = build_tool_call_artifact(\n        harness="copilot",\n        server_name="instapods",\n        tool_name="delete_pod",\n        source_scope="project",\n        config_path=server.config_path,\n        transport=transport,\n        server_fingerprint=fingerprint,\n        server_identity=identity,\n    )\n    payload = matching_mcp_contribution(artifact)\n    assert payload is not None\n    assert payload["id"] == "mcp.instapods"\n\n\n'''
+          if marker not in text:
+              raise SystemExit('test_guard_remote_mcp_contributions.py insertion marker changed')
+          remote_test.write_text(text.replace(marker, addition + marker, 1))
           PY
       - name: Regenerate extension projections and source-bound evidence
         run: |
@@ -111,25 +166,31 @@ jobs:
           uv run --no-sync ruff check \
             src/codex_plugin_scanner/guard/runtime/mcp_server_contribution.py \
             src/codex_plugin_scanner/guard/runtime/mcp_server_grants.py \
-            src/codex_plugin_scanner/guard/runtime/mcp_server_catalog.py \
+            src/codex_plugin_scanner/guard/cli/commands_support_runtime_resolution.py \
             tests/test_guard_remote_mcp_contributions.py
           uv run --no-sync ruff format --check \
             src/codex_plugin_scanner/guard/runtime/mcp_server_contribution.py \
             src/codex_plugin_scanner/guard/runtime/mcp_server_grants.py \
-            src/codex_plugin_scanner/guard/runtime/mcp_server_catalog.py \
             tests/test_guard_remote_mcp_contributions.py
-      - name: Commit generated and dashboard files
+      - name: Commit source and generated files
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add \
+            src/codex_plugin_scanner/guard/runtime/mcp_server_contribution.py \
+            src/codex_plugin_scanner/guard/runtime/mcp_server_grants.py \
+            src/codex_plugin_scanner/guard/cli/commands_support_runtime_resolution.py \
+            tests/test_guard_remote_mcp_contributions.py \
             dashboard/src/extension-controls-api.ts \
             dashboard/src/extension-controls-normalize.ts \
+            dashboard/src/extension-controls-normalize.test.ts \
+            dashboard/src/protection-center/mcp-server-defaults.tsx \
+            dashboard/src/protection-center/protection-module-detail.test.tsx \
             docs/guard/extensions/catalog.v1.json \
             docs/guard/extensions/README.md \
             tests/fixtures/guard-command-corpus/decision-diff-report.json
           if git diff --cached --quiet; then
             exit 0
           fi
-          git commit -m 'Regenerate InstaPods extension artifacts'
+          git commit -m 'Fix hosted MCP runtime and generated catalog'
           git push origin HEAD:codex/instapods-remote-mcp-extension
