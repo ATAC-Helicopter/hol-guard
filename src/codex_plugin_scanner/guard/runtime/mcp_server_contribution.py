@@ -52,7 +52,12 @@ def normalized_remote_mcp_url(value: object) -> str | None:
         parsed = urlsplit(value.strip())
     except ValueError:
         return None
-    if parsed.scheme.lower() != "https" or not parsed.hostname or parsed.username is not None or parsed.password is not None:
+    if (
+        parsed.scheme.lower() != "https"
+        or not parsed.hostname
+        or parsed.username is not None
+        or parsed.password is not None
+    ):
         return None
     try:
         port = parsed.port
@@ -118,14 +123,21 @@ def validate_mcp_contribution(payload: Mapping[str, object], *, filename: str = 
             raise ValueError(f"{filename} launch command is not an allowlisted package launcher")
     elif launch_kind == "remote-http":
         if normalized_remote_mcp_url(launch.get("url")) is None:
-            raise ValueError(f"{filename} remote launch URL must be a public HTTPS endpoint without credentials or a custom port")
+            raise ValueError(
+                f"{filename} remote launch URL must be a public HTTPS endpoint "
+                "without credentials or a custom port"
+            )
         server_names = launch.get("serverNames")
         normalized_names = (
             [normalized_remote_server_name(item) for item in server_names]
             if isinstance(server_names, list)
             else []
         )
-        if not normalized_names or any(item is None for item in normalized_names) or len(normalized_names) != len(set(normalized_names)):
+        if (
+            not normalized_names
+            or any(item is None for item in normalized_names)
+            or len(normalized_names) != len(set(normalized_names))
+        ):
             raise ValueError(f"{filename} remote launch server names are invalid or duplicate")
     else:
         raise ValueError(f"{filename} launch kind is unsupported")
