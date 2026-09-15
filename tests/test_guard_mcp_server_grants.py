@@ -115,14 +115,14 @@ def test_enabled_filesystem_keeps_read_on_review() -> None:
     assert apply_contributed_mcp_decision(enabled, artifact, "review") is None
 
 
-def test_enabled_review_default_can_reassert_existing_review(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_local_mcp_path_reasserts_enabled_review_default(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(
         "codex_plugin_scanner.guard.runtime.mcp_server_grants.mcp_tool_state",
         lambda *_args, **_kwargs: "review",
     )
     artifact = _artifact(_identity(), "write_file")
     enabled = _AuthorityStore((_layer(ControlLayerKind.LOCAL_ADMIN, "command.mcp-filesystem", ControlState.ENABLED),))
-    reviewed = apply_contributed_mcp_decision(enabled, artifact, "review")
+    reviewed = apply_local_mcp_extension_decision(enabled, artifact, "review")
     assert reviewed is not None
     assert reviewed[0] == "review"
     assert reviewed[1] == "catalog-mcp-extension"
