@@ -16,7 +16,7 @@ from .mcp_server_contribution import (
 )
 
 _REVIEW_ACTIONS = frozenset({"review", "require-reapproval", "warn"})
-_REMOTE_TRANSPORTS = frozenset({"http", "https", "remote", "streamable-http", "streamable_http"})
+_REMOTE_TRANSPORTS = frozenset({"http", "https", "remote", "sse", "streamable-http", "streamable_http"})
 
 
 def apply_contributed_mcp_decision(
