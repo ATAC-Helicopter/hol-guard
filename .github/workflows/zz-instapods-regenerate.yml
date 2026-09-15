@@ -1,0 +1,133 @@
+name: InstaPods branch regeneration
+
+on:
+  push:
+    branches:
+      - codex/instapods-remote-mcp-extension
+    paths:
+      - .github/workflows/zz-instapods-regenerate.yml
+
+permissions:
+  contents: write
+
+jobs:
+  regenerate:
+    if: github.repository == 'hashgraph-online/hol-guard'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+        with:
+          ref: codex/instapods-remote-mcp-extension
+          fetch-depth: 0
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
+        with:
+          python-version: '3.13'
+      - uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39
+        with:
+          version: 0.9.26
+          enable-cache: true
+      - name: Install locked development environment
+        run: uv sync --frozen --extra dev --python 3.13
+      - name: Teach the dashboard the remote MCP catalog shape
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          api = Path('dashboard/src/extension-controls-api.ts')
+          text = api.read_text()
+          old = '''export type McpToolDefaultState = "inherit" | "allow" | "block";
+
+          export type McpLaunch = {
+            kind: "package-launcher";
+            command: string;
+            package: string;
+          };'''
+          new = '''export type McpToolDefaultState = "inherit" | "allow" | "review" | "block";
+
+          export type McpLaunch =
+            | {
+                kind: "package-launcher";
+                command: string;
+                package: string;
+              }
+            | {
+                kind: "remote-http";
+                url: string;
+                serverNames: string[];
+              };'''
+          if old not in text:
+              raise SystemExit('extension-controls-api.ts MCP type block changed')
+          api.write_text(text.replace(old, new))
+
+          normalize = Path('dashboard/src/extension-controls-normalize.ts')
+          text = normalize.read_text()
+          old_launch = '''function mcpLaunch(value: unknown, label: string): McpLaunch {
+            const item = record(value, label);
+            return {
+              kind: enumValue(item.kind, `${label}.kind`, ["package-launcher"] as const),
+              command: string(item.command, `${label}.command`),
+              package: string(item.package, `${label}.package`),
+            };
+          }'''
+          new_launch = '''function mcpLaunch(value: unknown, label: string): McpLaunch {
+            const item = record(value, label);
+            const kind = enumValue(item.kind, `${label}.kind`, ["package-launcher", "remote-http"] as const);
+            if (kind === "package-launcher") {
+              return {
+                kind,
+                command: string(item.command, `${label}.command`),
+                package: string(item.package, `${label}.package`),
+              };
+            }
+            return {
+              kind,
+              url: string(item.url, `${label}.url`),
+              serverNames: stringList(item.serverNames, `${label}.serverNames`, 8),
+            };
+          }'''
+          if old_launch not in text:
+              raise SystemExit('extension-controls-normalize.ts MCP launch block changed')
+          text = text.replace(old_launch, new_launch)
+          old_state = 'state: enumValue(item.state, `${label}.state`, ["inherit", "allow", "block"] as const),'
+          new_state = 'state: enumValue(item.state, `${label}.state`, ["inherit", "allow", "review", "block"] as const),'
+          if old_state not in text:
+              raise SystemExit('extension-controls-normalize.ts MCP state block changed')
+          normalize.write_text(text.replace(old_state, new_state))
+          PY
+      - name: Regenerate extension projections and source-bound evidence
+        run: |
+          uv run --no-sync python scripts/export_extension_directory.py
+          uv run --no-sync python scripts/render_command_extension_directory.py
+          uv run --no-sync python tests/guard_command_decision_diff.py --write
+      - name: Focused verification
+        run: |
+          uv run --no-sync pytest -q \
+            tests/test_guard_remote_mcp_contributions.py \
+            tests/test_guard_mcp_server_contribution.py \
+            tests/test_guard_extension_trust.py \
+            tests/test_guard_extension_directory_export.py
+          uv run --no-sync ruff check \
+            src/codex_plugin_scanner/guard/runtime/mcp_server_contribution.py \
+            src/codex_plugin_scanner/guard/runtime/mcp_server_grants.py \
+            src/codex_plugin_scanner/guard/runtime/mcp_server_catalog.py \
+            tests/test_guard_remote_mcp_contributions.py
+          uv run --no-sync ruff format --check \
+            src/codex_plugin_scanner/guard/runtime/mcp_server_contribution.py \
+            src/codex_plugin_scanner/guard/runtime/mcp_server_grants.py \
+            src/codex_plugin_scanner/guard/runtime/mcp_server_catalog.py \
+            tests/test_guard_remote_mcp_contributions.py
+      - name: Commit generated and dashboard files
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add \
+            dashboard/src/extension-controls-api.ts \
+            dashboard/src/extension-controls-normalize.ts \
+            docs/guard/extensions/catalog.v1.json \
+            docs/guard/extensions/README.md \
+            tests/fixtures/guard-command-corpus/decision-diff-report.json
+          if git diff --cached --quiet; then
+            exit 0
+          fi
+          git commit -m 'Regenerate InstaPods extension artifacts'
+          git push origin HEAD:codex/instapods-remote-mcp-extension
