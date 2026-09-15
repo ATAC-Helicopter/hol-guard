@@ -19,6 +19,7 @@ from .mcp_server_contribution import (
 )
 
 _REVIEW_ACTIONS = frozenset({"review", "require-reapproval", "warn"})
+_REMOTE_TRANSPORTS = frozenset({"http", "https", "remote", "streamable-http", "streamable_http"})
 
 
 def apply_contributed_mcp_decision(
@@ -97,9 +98,8 @@ def _matches_remote_http_contribution(artifact: GuardArtifact, launch: Mapping[s
     if identity_command is not None:
         return identity_command == remote_url
     observed_config_digest = _server_config_digest(artifact)
-    if observed_config_digest is not None:
-        if observed_config_digest not in _remote_config_digests(remote_url):
-            return False
+    if observed_config_digest is not None and observed_config_digest not in _remote_config_digests(remote_url):
+        return False
     server_name = normalized_remote_server_name(_mcp_server_name(artifact))
     server_names = launch.get("serverNames")
     if server_name is None or not isinstance(server_names, list):
@@ -186,10 +186,11 @@ def _mcp_transport(artifact: GuardArtifact) -> str | None:
         if isinstance(identity, Mapping):
             transport = identity.get("transport")
             if isinstance(transport, str) and transport.strip():
-                return "http" if transport.strip().lower() in {"http", "https", "remote", "streamable-http", "streamable_http"} else transport.strip().lower()
+                normalized = transport.strip().lower()
+                return "http" if normalized in _REMOTE_TRANSPORTS else normalized
     if isinstance(artifact.transport, str) and artifact.transport.strip():
-        transport = artifact.transport.strip().lower()
-        return "http" if transport in {"http", "https", "remote", "streamable-http", "streamable_http"} else transport
+        normalized = artifact.transport.strip().lower()
+        return "http" if normalized in _REMOTE_TRANSPORTS else normalized
     return None
 
 
