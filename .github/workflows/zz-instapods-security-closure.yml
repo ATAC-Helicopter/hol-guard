@@ -70,13 +70,32 @@ jobs:
       - name: Install dependencies
         run: uv sync --frozen --extra dev --extra cisco
       - name: Run focused validation
+        id: validation
+        shell: bash
         run: |
-          uv run --no-sync ruff check \
+          set +e
+          uv run --no-sync ruff check --fix \
             src/codex_plugin_scanner/guard/runtime/mcp_protection.py \
             src/codex_plugin_scanner/guard/runtime/mcp_server_grants.py \
-            tests/test_guard_remote_mcp_contributions.py
-          uv run --no-sync pytest -q tests/test_guard_remote_mcp_contributions.py
+            tests/test_guard_remote_mcp_contributions.py 2>&1 | tee instapods-security-ruff.txt
+          ruff_status=${PIPESTATUS[0]}
+          uv run --no-sync pytest -q tests/test_guard_remote_mcp_contributions.py 2>&1 | tee instapods-security-pytest.txt
+          pytest_status=${PIPESTATUS[0]}
+          printf 'ruff_status=%s\npytest_status=%s\n' "$ruff_status" "$pytest_status" > instapods-security-status.txt
+          if [ "$ruff_status" -ne 0 ] || [ "$pytest_status" -ne 0 ]; then
+            exit 1
+          fi
+      - name: Upload validation output
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: instapods-security-validation
+          path: |
+            instapods-security-ruff.txt
+            instapods-security-pytest.txt
+            instapods-security-status.txt
       - name: Commit security fixes
+        if: always() && steps.validation.outcome == 'success'
         shell: bash
         run: |
           git rm .github/workflows/zz-instapods-security-closure.yml
