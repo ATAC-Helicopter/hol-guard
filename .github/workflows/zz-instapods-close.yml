@@ -44,6 +44,17 @@ jobs:
           code = '\n'.join(line[10:] if line.startswith('          ') else line for line in block.splitlines())
           exec(compile(code, 'instapods-source-fixes.py', 'exec'))
           EXTRACT
+      - name: Apply repository lint and format fixes
+        run: |
+          uv run --no-sync ruff check --fix \
+            src/codex_plugin_scanner/guard/runtime/mcp_server_contribution.py \
+            src/codex_plugin_scanner/guard/runtime/mcp_server_grants.py \
+            src/codex_plugin_scanner/guard/cli/commands_support_runtime_resolution.py \
+            tests/test_guard_remote_mcp_contributions.py
+          uv run --no-sync ruff format \
+            src/codex_plugin_scanner/guard/runtime/mcp_server_contribution.py \
+            src/codex_plugin_scanner/guard/runtime/mcp_server_grants.py \
+            tests/test_guard_remote_mcp_contributions.py
       - name: Export extension directory
         run: uv run --no-sync python scripts/export_extension_directory.py
       - name: Render extension documentation
