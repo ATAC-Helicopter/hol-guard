@@ -28,7 +28,7 @@ The schema is `contracts/mcp-servers/contribution.v1.schema.json`. Required meta
 
 Package-launched contributions use `launch.kind: package-launcher`, an allowlisted package command, and a package name. Launch matching uses the MCP package name, not the full argument hash, so user paths and extra flags still match.
 
-Hosted MCP servers may use `launch.kind: remote-http` with the official HTTPS endpoint and one or more canonical configured server names. When Guard has exact runtime endpoint evidence, the endpoint must match. Some harnesses expose only the configured server name and transport; that fallback is permitted only because remote contributions are forbidden from lowering policy to `allow`. A mismatched or unrecognized remote server stays on Guard's normal handling.
+Hosted MCP servers may use `launch.kind: remote-http` with the official HTTPS endpoint and one or more canonical configured server names. When Guard has exact runtime endpoint evidence, the endpoint must match. Query parameters are excluded from endpoint matching and from serialized server identity metadata, so query credentials are not emitted in Guard artifacts. Some harnesses expose only the configured server name and transport; that fallback is permitted only when no endpoint identity is available. A mismatched, malformed, or unrecognized remote endpoint stays on Guard's normal handling.
 
 Icons must use an allowlisted `react-icon` name or `kind: none`. Remote icon URLs are rejected. There is no downloaded detector and no Python matcher for v1 contribution metadata.
 
