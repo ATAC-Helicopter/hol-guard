@@ -179,6 +179,24 @@ def test_remote_http_url_contract_rejects_non_public_hosts(url: str) -> None:
     assert normalized_remote_mcp_url(url) is None
 
 
+@pytest.mark.parametrize(
+    "url",
+    (
+        "https://invalid host.example/mcp",
+        "https://bad_host.example/mcp",
+        "https://-bad.example/mcp",
+        "https://bad-.example/mcp",
+        "https://bad..example/mcp",
+        f"https://{'a' * 64}.example/mcp",
+        "https://" + ".".join(("a" * 63,) * 4) + "/mcp",
+    ),
+)
+def test_remote_http_url_contract_rejects_malformed_dns_hosts(url: str) -> None:
+    with pytest.raises(ValueError, match=r"schema|public HTTPS endpoint"):
+        validate_mcp_contribution(_remote_payload(url))
+    assert normalized_remote_mcp_url(url) is None
+
+
 def test_remote_http_url_contract_preserves_public_ipv6_brackets() -> None:
     url = "https://[2606:4700:4700::1111]/mcp"
     validate_mcp_contribution(_remote_payload(url))

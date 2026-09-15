@@ -46,6 +46,19 @@ def _normalized_tool_name(name: object) -> str:
     return "-".join(part for part in compact.split("-") if part)
 
 
+def _valid_dns_hostname(host: str) -> bool:
+    if len(host) > 253 or not host.isascii():
+        return False
+    labels = host.split(".")
+    return all(
+        1 <= len(label) <= 63
+        and label[0].isalnum()
+        and label[-1].isalnum()
+        and all(ch.isalnum() or ch == "-" for ch in label)
+        for label in labels
+    )
+
+
 def normalized_remote_mcp_url(value: object) -> str | None:
     if not isinstance(value, str) or not value.strip():
         return None
@@ -72,7 +85,7 @@ def normalized_remote_mcp_url(value: object) -> str | None:
     try:
         address = ip_address(host)
     except ValueError:
-        if host == "localhost" or host.endswith(".localhost") or "." not in host:
+        if host == "localhost" or host.endswith(".localhost") or "." not in host or not _valid_dns_hostname(host):
             return None
     else:
         if not address.is_global:
