@@ -11,8 +11,8 @@ from .mcp_server_contribution import (
     catalog_id_for_mcp_id,
     load_mcp_contribution_payloads,
     mcp_tool_state,
-    normalized_remote_mcp_url,
     normalized_remote_server_name,
+    remote_mcp_endpoint_identity,
 )
 
 _REVIEW_ACTIONS = frozenset({"review", "require-reapproval", "warn"})
@@ -88,16 +88,15 @@ def matching_mcp_contribution(artifact: GuardArtifact) -> dict[str, object] | No
 def _matches_remote_http_contribution(artifact: GuardArtifact, launch: Mapping[str, object]) -> bool:
     if _mcp_transport(artifact) != "http":
         return False
-    remote_url = normalized_remote_mcp_url(launch.get("url"))
-    if remote_url is None:
+    remote_endpoint = remote_mcp_endpoint_identity(launch.get("url"))
+    if remote_endpoint is None:
         return False
-    remote_endpoint = remote_url.partition("?")[0]
     identity_command_value = _mcp_identity_command(artifact)
     if identity_command_value is not None:
-        identity_command = normalized_remote_mcp_url(identity_command_value)
-        if identity_command is None:
+        identity_endpoint = remote_mcp_endpoint_identity(identity_command_value)
+        if identity_endpoint is None:
             return False
-        return identity_command.partition("?")[0] == remote_endpoint
+        return identity_endpoint == remote_endpoint
     server_name = normalized_remote_server_name(_mcp_server_name(artifact))
     server_names = launch.get("serverNames")
     if server_name is None or not isinstance(server_names, list):

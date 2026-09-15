@@ -97,6 +97,13 @@ def normalized_remote_mcp_url(value: object) -> str | None:
     return urlunsplit(("https", netloc, path, parsed.query, ""))
 
 
+def remote_mcp_endpoint_identity(value: object) -> str | None:
+    normalized = normalized_remote_mcp_url(value)
+    if normalized is None:
+        return None
+    return normalized.partition("?")[0]
+
+
 def normalized_remote_server_name(value: object) -> str | None:
     if not isinstance(value, str):
         return None
@@ -293,10 +300,13 @@ def _finalize_payloads(payloads: tuple[dict[str, object], ...]) -> tuple[dict[st
         remote_url = normalized_remote_mcp_url(launch.get("url"))
         if remote_url is None:
             raise ValueError(f"{mcp_id} is missing a valid remote URL")
-        previous_url = remote_urls.get(remote_url)
+        remote_endpoint = remote_mcp_endpoint_identity(remote_url)
+        if remote_endpoint is None:
+            raise ValueError(f"{mcp_id} is missing a valid remote endpoint")
+        previous_url = remote_urls.get(remote_endpoint)
         if previous_url is not None:
-            raise ValueError(f"duplicate MCP remote URL {remote_url} for {previous_url} and {mcp_id}")
-        remote_urls[remote_url] = mcp_id
+            raise ValueError(f"duplicate MCP remote endpoint {remote_endpoint} for {previous_url} and {mcp_id}")
+        remote_urls[remote_endpoint] = mcp_id
         server_names = launch.get("serverNames")
         if not isinstance(server_names, list):
             raise ValueError(f"{mcp_id} is missing remote server names")
