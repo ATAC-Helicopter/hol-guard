@@ -41,12 +41,25 @@ def _values_for_payload(payload: Mapping[str, object]) -> CommandExtensionValues
     launch = payload.get("launch")
     if not isinstance(launch, dict):
         raise ValueError(f"{mcp_id} is missing launch metadata")
-    command = launch.get("command")
-    package = launch.get("package")
-    if not isinstance(command, str) or not command.strip():
-        raise ValueError(f"{mcp_id} launch command is invalid")
-    if not isinstance(package, str) or not package.strip():
-        raise ValueError(f"{mcp_id} launch package is invalid")
+    launch_kind = launch.get("kind")
+    executables: tuple[str, ...]
+    if launch_kind == "package-launcher":
+        command = launch.get("command")
+        package = launch.get("package")
+        if not isinstance(command, str) or not command.strip():
+            raise ValueError(f"{mcp_id} launch command is invalid")
+        if not isinstance(package, str) or not package.strip():
+            raise ValueError(f"{mcp_id} launch package is invalid")
+        example = f"{command} -y {package}"
+        executables = (command,)
+    elif launch_kind == "remote-http":
+        remote_url = launch.get("url")
+        if not isinstance(remote_url, str) or not remote_url.strip():
+            raise ValueError(f"{mcp_id} remote launch URL is invalid")
+        example = remote_url.strip()
+        executables = ()
+    else:
+        raise ValueError(f"{mcp_id} launch kind is invalid")
     name = payload.get("name")
     description = payload.get("description")
     version = payload.get("version")
@@ -60,7 +73,6 @@ def _values_for_payload(payload: Mapping[str, object]) -> CommandExtensionValues
         raise ValueError(f"{mcp_id} requires risk classes")
     extension_id = catalog_id_for_mcp_id(mcp_id)
     action_classes = (_action_class_for(mcp_id),)
-    example = f"{command} -y {package}"
     return {
         "extension_id": extension_id,
         "version": version,
@@ -83,7 +95,7 @@ def _values_for_payload(payload: Mapping[str, object]) -> CommandExtensionValues
         "required": False,
         "delegated_protection": None,
         "ecosystem_ids": (),
-        "executables": (command,),
+        "executables": executables,
         "project_markers": (),
     }
 
