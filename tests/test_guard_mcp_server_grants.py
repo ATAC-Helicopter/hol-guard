@@ -191,6 +191,43 @@ def test_custom_mcp_grant_overrides_contribution(tmp_path: Path) -> None:
     assert granted[1] == "local-mcp-extension"
 
 
+def test_custom_mcp_block_overrides_base_allow(tmp_path: Path) -> None:
+    identity = _identity()
+    store = GuardStore(tmp_path / "guard-home")
+    cli_identity = UnlistedCliIdentity(
+        cli_id=f"local-cli.mcp-{identity.identity_hash[:8]}",
+        name=identity.package_name or "mcp-server",
+        kind="executable",
+        identity_hash=identity.identity_hash,
+        example_label="npx -y @modelcontextprotocol/server-filesystem",
+    )
+    store.record_local_cli_observation(
+        cli_identity,
+        seen_at=utc_now(),
+        surface="mcp",
+        server_identity_hash=identity.identity_hash,
+        server_command=identity.command,
+        server_args_hash=identity.args_hash,
+        help_status="ok",
+    )
+    store.replace_local_cli_commands(
+        cli_identity.cli_id,
+        (LocalCliCommand("write_file", "write_file", "write_file", "Write a file"),),
+    )
+    store.upsert_local_cli_grant(
+        identity=cli_identity,
+        state="allowed",
+        expected_revision=0,
+        updated_at=utc_now(),
+        command_states={"write_file": "block"},
+    )
+    artifact = _artifact(identity, "write_file")
+    granted = apply_local_mcp_extension_decision(store, artifact, "allow")
+    assert granted is not None
+    assert granted[0] == "block"
+    assert granted[1] == "local-mcp-extension"
+
+
 def test_evaluate_write_file_blocks_after_local_enable(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     identity = _identity()
     store = GuardStore(tmp_path / "guard-home")

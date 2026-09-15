@@ -41,7 +41,7 @@ def matching_local_cli_grant(
 ) -> tuple[UnlistedCliIdentity, LocalCliGrantState] | None:
     """Return an enrolled grant when the command matches an unlisted CLI identity."""
 
-    if current_action not in {"allow", "review", "require-reapproval", "warn"}:
+    if current_action not in {"review", "require-reapproval", "warn"}:
         return None
     identity = identify_package_json_scripts(command, cwd=cwd, home_dir=home_dir)
     if identity is None:
@@ -124,7 +124,7 @@ def matching_local_mcp_grant(
 ) -> LocalCliGrantState | None:
     """Return a this-device MCP extension grant for a live tools/call."""
 
-    if current_action not in {"review", "require-reapproval", "warn"}:
+    if current_action not in {"allow", "review", "require-reapproval", "warn"}:
         return None
     lookup = getattr(store, "read_local_mcp_grant", None)
     if not callable(lookup):

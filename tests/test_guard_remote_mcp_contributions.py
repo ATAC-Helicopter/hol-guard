@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import pytest
@@ -10,7 +11,11 @@ from codex_plugin_scanner.guard.cli.commands_support_runtime_resolution import (
     _copilot_runtime_server_identity,
     _CopilotMcpRuntimeServer,
 )
-from codex_plugin_scanner.guard.mcp_tool_calls import build_tool_call_artifact
+from codex_plugin_scanner.guard.mcp_tool_calls import (
+    ToolCallDecision,
+    _apply_temporary_mcp_grant,
+    build_tool_call_artifact,
+)
 from codex_plugin_scanner.guard.runtime.command_extensions import BUILT_IN_COMMAND_EXTENSION_REGISTRY
 from codex_plugin_scanner.guard.runtime.extension_control_authority import (
     AuthorityHealth,
@@ -30,6 +35,7 @@ from codex_plugin_scanner.guard.runtime.mcp_protection import (
     mcp_server_identity_metadata,
 )
 from codex_plugin_scanner.guard.runtime.mcp_server_contribution import (
+    load_mcp_contribution_payloads,
     normalized_remote_mcp_url,
     validate_mcp_contribution,
 )
@@ -117,6 +123,24 @@ def test_remote_instapods_review_default_strengthens_allow() -> None:
     assert decision is not None
     assert decision[0] == "review"
     assert decision[1] == "catalog-mcp-extension"
+
+
+def test_remote_instapods_review_default_strengthens_allow_in_runtime_path() -> None:
+    current = ToolCallDecision(
+        action="allow",
+        source="base-policy",
+        signals=(),
+        summary="Allowed by base policy.",
+    )
+    decision = _apply_temporary_mcp_grant(
+        store=_AuthorityStore(),
+        artifact=_remote_artifact("change_plan"),
+        artifact_hash="test-hash",
+        arguments={},
+        current=current,
+    )
+    assert decision.action == "review"
+    assert decision.source == "catalog-mcp-extension"
 
 
 def test_remote_instapods_manage_pod_inherits() -> None:
@@ -233,7 +257,6 @@ def test_copilot_remote_identity_matches_with_headers_and_standard_port(tmp_path
     assert payload["id"] == "mcp.instapods"
 
 
-
 def test_copilot_remote_identity_redacts_query_credentials_and_still_matches(tmp_path: Path) -> None:
     secret = "runtime-secret"
     server = _CopilotMcpRuntimeServer(
@@ -282,6 +305,25 @@ def test_invalid_remote_endpoint_does_not_fall_back_to_server_name(tmp_path: Pat
         server_identity=identity,
     )
     assert matching_mcp_contribution(artifact) is None
+
+
+def test_remote_http_contributions_reject_query_identity_collisions(tmp_path: Path) -> None:
+    alpha = _remote_payload("https://example.test/mcp?tenant=alpha")
+    alpha["id"] = "mcp.query-alpha"
+    alpha_launch = alpha["launch"]
+    assert isinstance(alpha_launch, dict)
+    alpha_launch["serverNames"] = ["query-alpha"]
+    beta = _remote_payload("https://example.test/mcp?tenant=beta")
+    beta["id"] = "mcp.query-beta"
+    beta_launch = beta["launch"]
+    assert isinstance(beta_launch, dict)
+    beta_launch["serverNames"] = ["query-beta"]
+    (tmp_path / "mcp.query-alpha.json").write_text(json.dumps(alpha), encoding="utf-8")
+    (tmp_path / "mcp.query-beta.json").write_text(json.dumps(beta), encoding="utf-8")
+
+    with pytest.raises(ValueError, match="duplicate MCP remote endpoint"):
+        load_mcp_contribution_payloads(tmp_path)
+
 
 def test_remote_http_contribution_rejects_allow_default() -> None:
     try:
