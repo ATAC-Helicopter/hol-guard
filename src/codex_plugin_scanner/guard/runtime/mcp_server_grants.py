@@ -2,10 +2,7 @@
 
 from __future__ import annotations
 
-import hashlib
-import json
 from collections.abc import Mapping
-from functools import lru_cache
 
 from ..models import GuardAction, GuardArtifact
 from .extension_control_contract import ExtensionControlLayer
@@ -97,50 +94,14 @@ def _matches_remote_http_contribution(artifact: GuardArtifact, launch: Mapping[s
     identity_command = normalized_remote_mcp_url(_mcp_identity_command(artifact))
     if identity_command is not None:
         return identity_command == remote_url
-    observed_config_digest = _server_config_digest(artifact)
-    if observed_config_digest is not None and observed_config_digest not in _remote_config_digests(remote_url):
-        return False
     server_name = normalized_remote_server_name(_mcp_server_name(artifact))
     server_names = launch.get("serverNames")
     if server_name is None or not isinstance(server_names, list):
         return False
     declared_names = {
-        normalized
-        for item in server_names
-        if (normalized := normalized_remote_server_name(item)) is not None
+        normalized for item in server_names if (normalized := normalized_remote_server_name(item)) is not None
     }
     return server_name in declared_names
-
-
-@lru_cache(maxsize=64)
-def _remote_config_digests(remote_url: str) -> frozenset[str]:
-    configs: list[dict[str, object]] = []
-    for transport_key in (None, "type", "transport"):
-        transport_values: tuple[str | None, ...]
-        if transport_key is None:
-            transport_values = (None,)
-        else:
-            transport_values = ("http", "https", "remote", "streamable-http", "streamable_http")
-        for transport in transport_values:
-            for enabled in (None, True):
-                config: dict[str, object] = {"url": remote_url}
-                if transport_key is not None and transport is not None:
-                    config[transport_key] = transport
-                if enabled is not None:
-                    config["enabled"] = enabled
-                configs.append(config)
-    return frozenset(_stable_config_digest(config) for config in configs)
-
-
-def _stable_config_digest(config: Mapping[str, object]) -> str:
-    encoded = json.dumps(
-        dict(config),
-        sort_keys=True,
-        separators=(",", ":"),
-        ensure_ascii=True,
-        allow_nan=False,
-    ).encode("utf-8")
-    return hashlib.sha256(encoded).hexdigest()
 
 
 def _authority_layers(store: object) -> tuple[ExtensionControlLayer, ...] | None:
@@ -199,26 +160,6 @@ def _mcp_server_name(artifact: GuardArtifact) -> object:
     if not isinstance(metadata, Mapping):
         return None
     return metadata.get("server_name")
-
-
-def _server_config_digest(artifact: GuardArtifact) -> str | None:
-    metadata = artifact.metadata
-    if not isinstance(metadata, Mapping):
-        return None
-    fingerprint = metadata.get("server_fingerprint")
-    if not isinstance(fingerprint, Mapping):
-        return None
-    for value in (
-        fingerprint.get("config_sha256"),
-        (
-            fingerprint.get("resolved_executable").get("server_config_sha256")
-            if isinstance(fingerprint.get("resolved_executable"), Mapping)
-            else None
-        ),
-    ):
-        if isinstance(value, str) and len(value) == 64:
-            return value.lower()
-    return None
 
 
 def _mcp_identity_tool_name(artifact: GuardArtifact) -> str | None:

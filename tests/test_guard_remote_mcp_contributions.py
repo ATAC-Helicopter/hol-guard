@@ -2,11 +2,20 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import pytest
 
+from codex_plugin_scanner.guard.cli.commands_support_runtime_resolution import (
+    _copilot_runtime_server_identity,
+    _CopilotMcpRuntimeServer,
+)
 from codex_plugin_scanner.guard.mcp_tool_calls import build_tool_call_artifact
 from codex_plugin_scanner.guard.runtime.command_extensions import BUILT_IN_COMMAND_EXTENSION_REGISTRY
-from codex_plugin_scanner.guard.runtime.extension_control_authority import AuthorityHealth, ExtensionControlAuthorityView
+from codex_plugin_scanner.guard.runtime.extension_control_authority import (
+    AuthorityHealth,
+    ExtensionControlAuthorityView,
+)
 from codex_plugin_scanner.guard.runtime.extension_control_contract import (
     CONTROL_SCHEMA_VERSION,
     ControlLayerKind,
@@ -150,9 +159,57 @@ def test_remote_http_url_contract_accepts_explicit_standard_https_port() -> None
     ),
 )
 def test_remote_http_url_contract_rejects_unsafe_authority(url: str) -> None:
-    with pytest.raises(ValueError, match="schema|public HTTPS endpoint"):
+    with pytest.raises(ValueError, match=r"schema|public HTTPS endpoint"):
         validate_mcp_contribution(_remote_payload(url))
     assert normalized_remote_mcp_url(url) is None
+
+
+@pytest.mark.parametrize(
+    "url",
+    (
+        "https://localhost/mcp",
+        "https://127.0.0.1/mcp",
+        "https://10.0.0.1/mcp",
+        "https://[::1]/mcp",
+    ),
+)
+def test_remote_http_url_contract_rejects_non_public_hosts(url: str) -> None:
+    with pytest.raises(ValueError, match=r"public HTTPS endpoint"):
+        validate_mcp_contribution(_remote_payload(url))
+    assert normalized_remote_mcp_url(url) is None
+
+
+def test_remote_http_url_contract_preserves_public_ipv6_brackets() -> None:
+    url = "https://[2606:4700:4700::1111]/mcp"
+    validate_mcp_contribution(_remote_payload(url))
+    assert normalized_remote_mcp_url(url) == url
+
+
+def test_copilot_remote_identity_matches_with_headers_and_standard_port(tmp_path: Path) -> None:
+    server = _CopilotMcpRuntimeServer(
+        server_name="instapods",
+        source_scope="project",
+        config_path=str(tmp_path / ".mcp.json"),
+        server_config={
+            "url": "https://app.instapods.com:443/api/mcp",
+            "headers": {"Authorization": "Bearer runtime-secret"},
+        },
+    )
+    identity, fingerprint, transport = _copilot_runtime_server_identity(server, launch_cwd=tmp_path)
+    assert identity.command == "https://app.instapods.com/api/mcp"
+    artifact = build_tool_call_artifact(
+        harness="copilot",
+        server_name="instapods",
+        tool_name="delete_pod",
+        source_scope="project",
+        config_path=server.config_path,
+        transport=transport,
+        server_fingerprint=fingerprint,
+        server_identity=identity,
+    )
+    payload = matching_mcp_contribution(artifact)
+    assert payload is not None
+    assert payload["id"] == "mcp.instapods"
 
 
 def test_remote_http_contribution_rejects_allow_default() -> None:

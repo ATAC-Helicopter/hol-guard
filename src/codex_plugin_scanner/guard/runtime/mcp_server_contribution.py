@@ -7,6 +7,7 @@ import sys
 from collections.abc import Mapping
 from functools import lru_cache
 from importlib import resources
+from ipaddress import ip_address
 from pathlib import Path
 from typing import Final, cast
 from urllib.parse import urlsplit, urlunsplit
@@ -68,7 +69,15 @@ def normalized_remote_mcp_url(value: object) -> str | None:
     host = parsed.hostname.lower().rstrip(".")
     if not host:
         return None
-    netloc = host
+    try:
+        address = ip_address(host)
+    except ValueError:
+        if host == "localhost" or host.endswith(".localhost") or "." not in host:
+            return None
+    else:
+        if not address.is_global:
+            return None
+    netloc = f"[{host}]" if ":" in host else host
     path = parsed.path or "/"
     if path != "/":
         path = path.rstrip("/") or "/"
@@ -124,14 +133,11 @@ def validate_mcp_contribution(payload: Mapping[str, object], *, filename: str = 
     elif launch_kind == "remote-http":
         if normalized_remote_mcp_url(launch.get("url")) is None:
             raise ValueError(
-                f"{filename} remote launch URL must be a public HTTPS endpoint "
-                "without credentials or a custom port"
+                f"{filename} remote launch URL must be a public HTTPS endpoint without credentials or a custom port"
             )
         server_names = launch.get("serverNames")
         normalized_names = (
-            [normalized_remote_server_name(item) for item in server_names]
-            if isinstance(server_names, list)
-            else []
+            [normalized_remote_server_name(item) for item in server_names] if isinstance(server_names, list) else []
         )
         if (
             not normalized_names
