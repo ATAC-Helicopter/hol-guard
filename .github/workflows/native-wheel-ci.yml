@@ -252,7 +252,6 @@ jobs:
         env:
           MACOSX_DEPLOYMENT_TARGET: ${{ matrix.deployment_target }}
           PLATFORM_TAG: ${{ matrix.platform_tag }}
-          TARGET: ${{ matrix.target }}
           NATIVE_STOP_DIAGNOSTIC_PATH: native-stop-diagnostic.json
         run: |
           unset HOL_GUARD_NATIVE HOL_GUARD_NATIVE_BINARY HOL_GUARD_HOOK_FAST_PATH
@@ -267,65 +266,14 @@ jobs:
           unset GUARD_TEST_KEYRING_FILE GUARD_TEST_SYNC_AUTH_CONTEXT_JSON GUARD_PYTEST_DURATION_OUTPUT
           unset PYTEST_CURRENT_TEST PYTEST_ADDOPTS PYTEST_PLUGINS PYTHONPATH
           runtime=$(.venv/bin/python -c 'from codex_plugin_scanner.guard.native_runtime import native_runtime_status; status = native_runtime_status(); assert status.identity is not None; print(status.identity.path)')
-          run_installed_slo() {
-            local output_path="$1"
-            .venv/bin/python scripts/bench_guard_native_installed_slo.py \
-              --runtime "$runtime" \
-              --warm-iterations 2 \
-              --cold-iterations 2 \
-              --recovery-iterations 2 \
-              --readiness-samples 2 \
-              --json "$output_path" \
-              --enforce
-          }
-          retryable_intel_latency_miss() {
-            .venv/bin/python - "$1" <<'PY_CHECK'
-          import json
-          import sys
-          from pathlib import Path
-
-          payload = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
-          gates = payload.get("gates")
-          concurrency = payload.get("concurrency")
-          sixteen = concurrency.get("sixteen") if isinstance(concurrency, dict) else None
-          retryable = (
-              isinstance(gates, dict)
-              and gates.get("concurrency") is False
-              and all(value is True for key, value in gates.items() if key != "concurrency")
-              and payload.get("errors_16") == 0
-              and isinstance(sixteen, dict)
-              and sixteen.get("errors") == 0
-              and sixteen.get("overloaded") == 0
-          )
-          raise SystemExit(0 if retryable else 1)
-          PY_CHECK
-          }
-          # Intel hosted runners may add transient scheduler latency; retry only pure latency misses.
-          if [[ "$TARGET" == "x86_64-apple-darwin" ]]; then
-            slo_status=1
-            for attempt in 1 2 3; do
-              output_path="native-installed-slo-attempt-${attempt}.json"
-              set +e
-              run_installed_slo "$output_path"
-              slo_status=$?
-              set -e
-              cp "$output_path" native-installed-slo.json
-              if [[ "$slo_status" -eq 0 ]]; then
-                break
-              fi
-              if ! retryable_intel_latency_miss "$output_path"; then
-                echo "Intel macOS SLO failed for a non-retryable reason." >&2
-                exit "$slo_status"
-              fi
-              echo "::warning::Intel macOS strict concurrency-latency gate missed on attempt ${attempt}/3; retrying the same installed wheel."
-            done
-            if [[ "$slo_status" -ne 0 ]]; then
-              echo "Intel macOS strict concurrency-latency gate failed all three attempts." >&2
-              exit "$slo_status"
-            fi
-          else
-            run_installed_slo native-installed-slo.json
-          fi
+          .venv/bin/python scripts/bench_guard_native_installed_slo.py \
+            --runtime "$runtime" \
+            --warm-iterations 2 \
+            --cold-iterations 2 \
+            --recovery-iterations 2 \
+            --readiness-samples 2 \
+            --json native-installed-slo.json \
+            --enforce
           VERSION=$(uv run --no-sync python scripts/sync_repo_version.py --check)
           cp "pure-dist/hol_guard-${VERSION}-py3-none-any.whl" native-dist/
           SOURCE_SHA="${GITHUB_SHA:?missing GitHub source SHA}"
@@ -348,7 +296,6 @@ jobs:
             native-default-auto.json
             installed-pi-output.json
             native-installed-slo.json
-            native-installed-slo-attempt-*.json
             native-artifact-evidence.json
             native-stop-diagnostic.json
           if-no-files-found: warn

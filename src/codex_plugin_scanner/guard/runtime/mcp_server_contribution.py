@@ -31,6 +31,7 @@ _ALLOWED_ICON_NAMES: Final = frozenset(
 _ALLOWED_LAUNCHERS: Final = frozenset({"bunx", "npx", "npm", "pnpm", "uvx", "yarn", "pipx"})
 _TOOL_STATES: Final = frozenset({"inherit", "allow", "review", "block"})
 _REMOTE_TOOL_STATES: Final = frozenset({"inherit", "review", "block"})
+_REMOTE_MCP_URL_MAX_LENGTH: Final = 260
 
 
 def contributions_dir() -> Path:
@@ -60,10 +61,13 @@ def _valid_dns_hostname(host: str) -> bool:
 
 
 def normalized_remote_mcp_url(value: object) -> str | None:
-    if not isinstance(value, str) or not value.strip():
+    if not isinstance(value, str):
+        return None
+    candidate = value.strip()
+    if not candidate or len(candidate) > _REMOTE_MCP_URL_MAX_LENGTH or not candidate.isascii():
         return None
     try:
-        parsed = urlsplit(value.strip())
+        parsed = urlsplit(candidate)
     except ValueError:
         return None
     if (
