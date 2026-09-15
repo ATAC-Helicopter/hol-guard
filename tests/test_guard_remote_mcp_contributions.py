@@ -40,6 +40,7 @@ from codex_plugin_scanner.guard.runtime.mcp_server_contribution import (
     validate_mcp_contribution,
 )
 from codex_plugin_scanner.guard.runtime.mcp_server_grants import (
+    _matches_remote_http_contribution,
     apply_contributed_mcp_decision,
     matching_mcp_contribution,
 )
@@ -72,12 +73,12 @@ class _AuthorityStore:
         )
 
 
-def _remote_artifact(tool_name: str, *, server_name: str = "instapods"):
+def _remote_artifact(tool_name: str, *, server_name: str = "instapods", transport: str = "http"):
     identity = build_mcp_server_identity(
         config_path=".mcp.json",
         command="https://app.instapods.com/api/mcp",
         args=(),
-        transport="http",
+        transport=transport,
     )
     return build_tool_call_artifact(
         harness="codex",
@@ -85,7 +86,7 @@ def _remote_artifact(tool_name: str, *, server_name: str = "instapods"):
         tool_name=tool_name,
         source_scope="project",
         config_path=".mcp.json",
-        transport="http",
+        transport=transport,
         server_identity=identity,
     )
 
@@ -116,6 +117,16 @@ def test_remote_instapods_matches_exact_endpoint_even_with_custom_server_name() 
     payload = matching_mcp_contribution(_remote_artifact("delete_pod", server_name="production-pods"))
     assert payload is not None
     assert payload["id"] == "mcp.instapods"
+
+
+def test_remote_instapods_sse_transport_receives_review_default() -> None:
+    artifact = _remote_artifact("change_plan", transport="sse")
+    payload = matching_mcp_contribution(artifact)
+    assert payload is not None
+    assert payload["id"] == "mcp.instapods"
+    decision = apply_contributed_mcp_decision(_AuthorityStore(), artifact, "allow")
+    assert decision is not None
+    assert decision[0] == "review"
 
 
 def test_remote_instapods_review_default_strengthens_allow() -> None:
@@ -196,7 +207,9 @@ def test_remote_http_url_contract_rejects_unsafe_authority(url: str) -> None:
     (
         "https://localhost/mcp",
         "https://127.0.0.1/mcp",
+        "https://127.1/mcp",
         "https://10.0.0.1/mcp",
+        "https://10.1/mcp",
         "https://[::1]/mcp",
     ),
 )
@@ -224,10 +237,53 @@ def test_remote_http_url_contract_rejects_malformed_dns_hosts(url: str) -> None:
     assert normalized_remote_mcp_url(url) is None
 
 
-def test_remote_http_url_contract_preserves_public_ipv6_brackets() -> None:
-    url = "https://[2606:4700:4700::1111]/mcp"
-    validate_mcp_contribution(_remote_payload(url))
-    assert normalized_remote_mcp_url(url) == url
+def test_remote_http_url_contract_canonicalizes_public_ipv6() -> None:
+    compressed = "https://[2606:4700:4700::1111]/mcp"
+    expanded = "https://[2606:4700:4700:0:0:0:0:1111]/mcp"
+    validate_mcp_contribution(_remote_payload(compressed))
+    validate_mcp_contribution(_remote_payload(expanded))
+    assert normalized_remote_mcp_url(compressed) == compressed
+    assert normalized_remote_mcp_url(expanded) == compressed
+
+
+def test_remote_http_runtime_matches_equivalent_ipv6_spellings() -> None:
+    compressed = "https://[2606:4700:4700::1111]/mcp"
+    expanded = "https://[2606:4700:4700:0:0:0:0:1111]/mcp"
+    identity = build_mcp_server_identity(
+        config_path=".mcp.json",
+        command=expanded,
+        args=(),
+        transport="http",
+    )
+    artifact = build_tool_call_artifact(
+        harness="codex",
+        server_name="ipv6-service",
+        tool_name="write_data",
+        source_scope="project",
+        config_path=".mcp.json",
+        transport="http",
+        server_identity=identity,
+    )
+    launch = {"kind": "remote-http", "url": compressed, "serverNames": ["ipv6-service"]}
+    assert _matches_remote_http_contribution(artifact, launch)
+
+
+def test_remote_http_contributions_reject_equivalent_ipv6_endpoints(tmp_path: Path) -> None:
+    compressed = _remote_payload("https://[2606:4700:4700::1111]/mcp")
+    compressed["id"] = "mcp.ipv6-compressed"
+    compressed_launch = compressed["launch"]
+    assert isinstance(compressed_launch, dict)
+    compressed_launch["serverNames"] = ["ipv6-compressed"]
+    expanded = _remote_payload("https://[2606:4700:4700:0:0:0:0:1111]/mcp")
+    expanded["id"] = "mcp.ipv6-expanded"
+    expanded_launch = expanded["launch"]
+    assert isinstance(expanded_launch, dict)
+    expanded_launch["serverNames"] = ["ipv6-expanded"]
+    (tmp_path / "mcp.ipv6-compressed.json").write_text(json.dumps(compressed), encoding="utf-8")
+    (tmp_path / "mcp.ipv6-expanded.json").write_text(json.dumps(expanded), encoding="utf-8")
+
+    with pytest.raises(ValueError, match="duplicate MCP remote endpoint"):
+        load_mcp_contribution_payloads(tmp_path)
 
 
 def test_copilot_remote_identity_matches_with_headers_and_standard_port(tmp_path: Path) -> None:
