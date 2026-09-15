@@ -7,7 +7,11 @@ from typing import Final
 
 from .command_extension_specs import CommandExtensionValues
 from .command_permission_catalog import permissions_for_action_classes
-from .mcp_server_contribution import catalog_id_for_mcp_id, load_mcp_contribution_payloads
+from .mcp_server_contribution import (
+    catalog_id_for_mcp_id,
+    load_mcp_contribution_payloads,
+    remote_mcp_endpoint_identity,
+)
 
 
 def _string_tuple(value: object) -> tuple[str, ...]:
@@ -54,9 +58,9 @@ def _values_for_payload(payload: Mapping[str, object]) -> CommandExtensionValues
         executables = (command,)
     elif launch_kind == "remote-http":
         remote_url = launch.get("url")
-        if not isinstance(remote_url, str) or not remote_url.strip():
+        example = remote_mcp_endpoint_identity(remote_url)
+        if example is None:
             raise ValueError(f"{mcp_id} remote launch URL is invalid")
-        example = remote_url.strip()
         executables = ()
     else:
         raise ValueError(f"{mcp_id} launch kind is invalid")
