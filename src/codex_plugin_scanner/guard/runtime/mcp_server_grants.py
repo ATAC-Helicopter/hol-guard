@@ -48,7 +48,7 @@ def apply_contributed_mcp_decision(
             "This MCP tool is blocked by a catalog MCP server on this device.",
         )
     if state == "review":
-        if current_action not in {"allow", "warn"}:
+        if current_action not in {"allow", "review", "warn"}:
             return None
         return (
             "review",
