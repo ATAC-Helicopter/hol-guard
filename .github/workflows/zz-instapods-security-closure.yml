@@ -58,6 +58,11 @@ jobs:
               '''from codex_plugin_scanner.guard.runtime.mcp_protection import build_mcp_server_identity\n''',
               '''from codex_plugin_scanner.guard.runtime.mcp_protection import (\n    build_mcp_server_identity,\n    mcp_server_identity_metadata,\n)\n''',
           )
+          replace(
+              'tests/test_guard_remote_mcp_contributions.py',
+              '''    with pytest.raises(ValueError, match=r"public HTTPS endpoint"):\n''',
+              '''    with pytest.raises(ValueError, match=r"schema|public HTTPS endpoint"):\n''',
+          )
 
           tests = Path('tests/test_guard_remote_mcp_contributions.py')
           text = tests.read_text(encoding='utf-8')
