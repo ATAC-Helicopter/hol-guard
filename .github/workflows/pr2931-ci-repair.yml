@@ -82,13 +82,17 @@ jobs:
           if not windows_marker:
               raise SystemExit("windows job marker not found")
 
-          env_old = """          PLATFORM_TAG: ${{ matrix.platform_tag }}
-          NATIVE_STOP_DIAGNOSTIC_PATH: native-stop-diagnostic.json
-"""
-          env_new = """          PLATFORM_TAG: ${{ matrix.platform_tag }}
-          TARGET: ${{ matrix.target }}
-          NATIVE_STOP_DIAGNOSTIC_PATH: native-stop-diagnostic.json
-"""
+          platform_tag_expr = "$" + "{{ matrix.platform_tag }}"
+          target_expr = "$" + "{{ matrix.target }}"
+          env_old = (
+              f"          PLATFORM_TAG: {platform_tag_expr}\n"
+              "          NATIVE_STOP_DIAGNOSTIC_PATH: native-stop-diagnostic.json\n"
+          )
+          env_new = (
+              f"          PLATFORM_TAG: {platform_tag_expr}\n"
+              f"          TARGET: {target_expr}\n"
+              "          NATIVE_STOP_DIAGNOSTIC_PATH: native-stop-diagnostic.json\n"
+          )
           if env_old not in macos:
               raise SystemExit("macOS SLO env block not found")
           macos = macos.replace(env_old, env_new, 1)
