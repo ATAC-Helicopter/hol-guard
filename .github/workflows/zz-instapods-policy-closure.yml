@@ -122,3 +122,5 @@ jobs:
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git commit -m 'fix: enforce hosted MCP review policy'
           git push origin HEAD:codex/instapods-remote-mcp-extension
+
+# rerun closure
