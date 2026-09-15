@@ -85,11 +85,14 @@ def normalized_remote_mcp_url(value: object) -> str | None:
     try:
         address = ip_address(host)
     except ValueError:
+        if all(ch.isdigit() or ch == "." for ch in host):
+            return None
         if host == "localhost" or host.endswith(".localhost") or "." not in host or not _valid_dns_hostname(host):
             return None
     else:
         if not address.is_global:
             return None
+        host = str(address)
     netloc = f"[{host}]" if ":" in host else host
     path = parsed.path or "/"
     if path != "/":
