@@ -9,6 +9,7 @@ from functools import lru_cache
 from importlib import resources
 from pathlib import Path
 from typing import Final, cast
+from urllib.parse import urlsplit, urlunsplit
 
 from jsonschema import Draft202012Validator
 from jsonschema.exceptions import ValidationError
@@ -27,6 +28,8 @@ _ALLOWED_ICON_NAMES: Final = frozenset(
     }
 )
 _ALLOWED_LAUNCHERS: Final = frozenset({"bunx", "npx", "npm", "pnpm", "uvx", "yarn", "pipx"})
+_TOOL_STATES: Final = frozenset({"inherit", "allow", "review", "block"})
+_REMOTE_TOOL_STATES: Final = frozenset({"inherit", "review", "block"})
 
 
 def contributions_dir() -> Path:
@@ -40,6 +43,38 @@ def catalog_id_for_mcp_id(mcp_id: str) -> str:
 def _normalized_tool_name(name: object) -> str:
     compact = "".join(ch.lower() if ch.isalnum() else "-" for ch in str(name).strip()).strip("-")
     return "-".join(part for part in compact.split("-") if part)
+
+
+def normalized_remote_mcp_url(value: object) -> str | None:
+    if not isinstance(value, str) or not value.strip():
+        return None
+    try:
+        parsed = urlsplit(value.strip())
+    except ValueError:
+        return None
+    if parsed.scheme.lower() != "https" or not parsed.hostname or parsed.username is not None or parsed.password is not None:
+        return None
+    try:
+        port = parsed.port
+    except ValueError:
+        return None
+    if port not in {None, 443}:
+        return None
+    host = parsed.hostname.lower().rstrip(".")
+    if not host:
+        return None
+    netloc = host
+    path = parsed.path or "/"
+    if path != "/":
+        path = path.rstrip("/") or "/"
+    return urlunsplit(("https", netloc, path, parsed.query, ""))
+
+
+def normalized_remote_server_name(value: object) -> str | None:
+    if not isinstance(value, str):
+        return None
+    normalized = " ".join(value.strip().casefold().split())
+    return normalized or None
 
 
 def load_mcp_contribution_payloads(root: Path | None = None) -> tuple[dict[str, object], ...]:
@@ -75,8 +110,25 @@ def validate_mcp_contribution(payload: Mapping[str, object], *, filename: str = 
     if isinstance(icon, dict) and icon.get("kind") == "react-icon" and icon.get("name") not in _ALLOWED_ICON_NAMES:
         raise ValueError(f"{filename} uses an icon name that is not allowlisted")
     launch = payload.get("launch")
-    if not isinstance(launch, dict) or launch.get("command") not in _ALLOWED_LAUNCHERS:
-        raise ValueError(f"{filename} launch command is not an allowlisted package launcher")
+    if not isinstance(launch, dict):
+        raise ValueError(f"{filename} launch metadata is invalid")
+    launch_kind = launch.get("kind")
+    if launch_kind == "package-launcher":
+        if launch.get("command") not in _ALLOWED_LAUNCHERS:
+            raise ValueError(f"{filename} launch command is not an allowlisted package launcher")
+    elif launch_kind == "remote-http":
+        if normalized_remote_mcp_url(launch.get("url")) is None:
+            raise ValueError(f"{filename} remote launch URL must be a public HTTPS endpoint without credentials or a custom port")
+        server_names = launch.get("serverNames")
+        normalized_names = (
+            [normalized_remote_server_name(item) for item in server_names]
+            if isinstance(server_names, list)
+            else []
+        )
+        if not normalized_names or any(item is None for item in normalized_names) or len(normalized_names) != len(set(normalized_names)):
+            raise ValueError(f"{filename} remote launch server names are invalid or duplicate")
+    else:
+        raise ValueError(f"{filename} launch kind is unsupported")
     tools = payload.get("tools")
     if not isinstance(tools, list) or not tools:
         raise ValueError(f"{filename} must declare tools")
@@ -87,6 +139,14 @@ def validate_mcp_contribution(payload: Mapping[str, object], *, filename: str = 
     ]
     if not names or len(names) != len(set(names)):
         raise ValueError(f"{filename} declares duplicate tool names")
+    for item in tools:
+        if not isinstance(item, dict):
+            continue
+        state = item.get("state")
+        if state not in _TOOL_STATES:
+            raise ValueError(f"{filename} declares unsupported MCP tool state {state!r}")
+        if launch_kind == "remote-http" and state not in _REMOTE_TOOL_STATES:
+            raise ValueError(f"{filename} remote HTTP contributions cannot declare allow defaults")
 
 
 def mcp_catalog_ids(root: Path | None = None) -> frozenset[str]:
@@ -105,10 +165,10 @@ def mcp_tool_state(payload: Mapping[str, object], tool_name: str) -> str:
         name = item.get("name")
         state = item.get("state")
         normalized = _normalized_tool_name(name) if isinstance(name, str) else ""
-        if normalized == "other" and state in {"inherit", "allow", "block"}:
-            fallback = state
-        if normalized == wanted and state in {"inherit", "allow", "block"}:
-            return state
+        if normalized == "other" and state in _TOOL_STATES:
+            fallback = cast(str, state)
+        if normalized == wanted and state in _TOOL_STATES:
+            return cast(str, state)
     return fallback
 
 
@@ -174,6 +234,8 @@ def _load_packaged_payloads() -> tuple[dict[str, object], ...]:
 
 def _finalize_payloads(payloads: tuple[dict[str, object], ...]) -> tuple[dict[str, object], ...]:
     packages: dict[str, str] = {}
+    remote_urls: dict[str, str] = {}
+    remote_names: dict[str, str] = {}
     ids: set[str] = set()
     for payload in payloads:
         mcp_id = payload.get("id")
@@ -183,14 +245,38 @@ def _finalize_payloads(payloads: tuple[dict[str, object], ...]) -> tuple[dict[st
             raise ValueError(f"duplicate MCP contribution id {mcp_id}")
         ids.add(mcp_id)
         launch = payload.get("launch")
-        package = launch.get("package") if isinstance(launch, dict) else None
-        if not isinstance(package, str) or not package.strip():
-            raise ValueError(f"{mcp_id} is missing a launch package")
-        key = package.strip().lower()
-        previous = packages.get(key)
-        if previous is not None:
-            raise ValueError(f"duplicate MCP launch package {package} for {previous} and {mcp_id}")
-        packages[key] = mcp_id
+        if not isinstance(launch, dict):
+            raise ValueError(f"{mcp_id} is missing launch metadata")
+        if launch.get("kind") == "package-launcher":
+            package = launch.get("package")
+            if not isinstance(package, str) or not package.strip():
+                raise ValueError(f"{mcp_id} is missing a launch package")
+            key = package.strip().lower()
+            previous = packages.get(key)
+            if previous is not None:
+                raise ValueError(f"duplicate MCP launch package {package} for {previous} and {mcp_id}")
+            packages[key] = mcp_id
+            continue
+        if launch.get("kind") != "remote-http":
+            raise ValueError(f"{mcp_id} has unsupported launch metadata")
+        remote_url = normalized_remote_mcp_url(launch.get("url"))
+        if remote_url is None:
+            raise ValueError(f"{mcp_id} is missing a valid remote URL")
+        previous_url = remote_urls.get(remote_url)
+        if previous_url is not None:
+            raise ValueError(f"duplicate MCP remote URL {remote_url} for {previous_url} and {mcp_id}")
+        remote_urls[remote_url] = mcp_id
+        server_names = launch.get("serverNames")
+        if not isinstance(server_names, list):
+            raise ValueError(f"{mcp_id} is missing remote server names")
+        for raw_name in server_names:
+            server_name = normalized_remote_server_name(raw_name)
+            if server_name is None:
+                raise ValueError(f"{mcp_id} has invalid remote server name")
+            previous_name = remote_names.get(server_name)
+            if previous_name is not None:
+                raise ValueError(f"duplicate MCP remote server name {raw_name} for {previous_name} and {mcp_id}")
+            remote_names[server_name] = mcp_id
     return payloads
 
 
