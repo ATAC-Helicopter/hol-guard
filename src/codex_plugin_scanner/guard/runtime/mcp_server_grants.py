@@ -91,9 +91,13 @@ def _matches_remote_http_contribution(artifact: GuardArtifact, launch: Mapping[s
     remote_url = normalized_remote_mcp_url(launch.get("url"))
     if remote_url is None:
         return False
-    identity_command = normalized_remote_mcp_url(_mcp_identity_command(artifact))
-    if identity_command is not None:
-        return identity_command == remote_url
+    remote_endpoint = remote_url.partition("?")[0]
+    identity_command_value = _mcp_identity_command(artifact)
+    if identity_command_value is not None:
+        identity_command = normalized_remote_mcp_url(identity_command_value)
+        if identity_command is None:
+            return False
+        return identity_command.partition("?")[0] == remote_endpoint
     server_name = normalized_remote_server_name(_mcp_server_name(artifact))
     server_names = launch.get("serverNames")
     if server_name is None or not isinstance(server_names, list):

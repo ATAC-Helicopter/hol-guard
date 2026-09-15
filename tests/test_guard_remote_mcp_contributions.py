@@ -25,7 +25,10 @@ from codex_plugin_scanner.guard.runtime.extension_control_contract import (
     ExtensionControl,
     ExtensionControlLayer,
 )
-from codex_plugin_scanner.guard.runtime.mcp_protection import build_mcp_server_identity
+from codex_plugin_scanner.guard.runtime.mcp_protection import (
+    build_mcp_server_identity,
+    mcp_server_identity_metadata,
+)
 from codex_plugin_scanner.guard.runtime.mcp_server_contribution import (
     normalized_remote_mcp_url,
     validate_mcp_contribution,
@@ -174,7 +177,7 @@ def test_remote_http_url_contract_rejects_unsafe_authority(url: str) -> None:
     ),
 )
 def test_remote_http_url_contract_rejects_non_public_hosts(url: str) -> None:
-    with pytest.raises(ValueError, match=r"public HTTPS endpoint"):
+    with pytest.raises(ValueError, match=r"schema|public HTTPS endpoint"):
         validate_mcp_contribution(_remote_payload(url))
     assert normalized_remote_mcp_url(url) is None
 
@@ -229,6 +232,56 @@ def test_copilot_remote_identity_matches_with_headers_and_standard_port(tmp_path
     assert payload is not None
     assert payload["id"] == "mcp.instapods"
 
+
+
+def test_copilot_remote_identity_redacts_query_credentials_and_still_matches(tmp_path: Path) -> None:
+    secret = "runtime-secret"
+    server = _CopilotMcpRuntimeServer(
+        server_name="instapods",
+        source_scope="project",
+        config_path=str(tmp_path / ".mcp.json"),
+        server_config={"url": f"https://app.instapods.com/api/mcp?token={secret}"},
+    )
+    identity, fingerprint, transport = _copilot_runtime_server_identity(server, launch_cwd=tmp_path)
+    serialized_identity = mcp_server_identity_metadata(identity)
+    assert serialized_identity["command"] == "https://app.instapods.com/api/mcp"
+    assert secret not in str(serialized_identity)
+    artifact = build_tool_call_artifact(
+        harness="copilot",
+        server_name="instapods",
+        tool_name="delete_pod",
+        source_scope="project",
+        config_path=server.config_path,
+        transport=transport,
+        server_fingerprint=fingerprint,
+        server_identity=identity,
+    )
+    assert secret not in str(artifact.to_dict())
+    payload = matching_mcp_contribution(artifact)
+    assert payload is not None
+    assert payload["id"] == "mcp.instapods"
+
+
+def test_invalid_remote_endpoint_does_not_fall_back_to_server_name(tmp_path: Path) -> None:
+    server = _CopilotMcpRuntimeServer(
+        server_name="instapods",
+        source_scope="project",
+        config_path=str(tmp_path / ".mcp.json"),
+        server_config={"url": "http://app.instapods.com/api/mcp"},
+    )
+    identity, fingerprint, transport = _copilot_runtime_server_identity(server, launch_cwd=tmp_path)
+    assert identity.command == "<unresolved>"
+    artifact = build_tool_call_artifact(
+        harness="copilot",
+        server_name="instapods",
+        tool_name="delete_pod",
+        source_scope="project",
+        config_path=server.config_path,
+        transport=transport,
+        server_fingerprint=fingerprint,
+        server_identity=identity,
+    )
+    assert matching_mcp_contribution(artifact) is None
 
 def test_remote_http_contribution_rejects_allow_default() -> None:
     try:
