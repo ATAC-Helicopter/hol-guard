@@ -300,6 +300,7 @@ jobs:
           raise SystemExit(0 if retryable else 1)
           PY_CHECK
           }
+          # Intel hosted runners may add transient scheduler latency; retry only pure latency misses.
           if [[ "$TARGET" == "x86_64-apple-darwin" ]]; then
             slo_status=1
             for attempt in 1 2 3; do
