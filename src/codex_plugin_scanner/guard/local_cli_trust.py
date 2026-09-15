@@ -113,7 +113,14 @@ def apply_local_mcp_extension_decision(
         )
     from .runtime.mcp_server_grants import apply_contributed_mcp_decision
 
-    return apply_contributed_mcp_decision(store, artifact, current_action)
+    contributed = apply_contributed_mcp_decision(store, artifact, current_action)
+    if contributed is not None:
+        return contributed
+    if current_action == "review":
+        reasserted = apply_contributed_mcp_decision(store, artifact, "allow")
+        if reasserted is not None and reasserted[0] == "review":
+            return reasserted
+    return None
 
 
 def matching_local_mcp_grant(
