@@ -6,6 +6,8 @@ on:
       - codex/instapods-remote-mcp-extension
     paths:
       - .github/workflows/zz-instapods-regenerate.yml
+      - contracts/mcp-servers/contribution.v1.schema.json
+      - tests/test_guard_remote_mcp_contributions.py
 
 permissions:
   contents: write
