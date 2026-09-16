@@ -34,6 +34,9 @@ _REMOTE_TOOL_STATES: Final = frozenset({"inherit", "review", "block"})
 _REMOTE_MCP_URL_MAX_LENGTH: Final = 260
 _HEX_DIGITS: Final = frozenset("0123456789abcdefABCDEF")
 _UNRESERVED_PATH_CHARS: Final = frozenset("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~")
+_SUB_DELIMITERS: Final = frozenset("!$&'()*+,;=")
+_REMOTE_PATH_CHARS: Final = _UNRESERVED_PATH_CHARS | _SUB_DELIMITERS | frozenset(":@/")
+_REMOTE_QUERY_CHARS: Final = _REMOTE_PATH_CHARS | frozenset("?")
 
 
 def contributions_dir() -> Path:
@@ -62,13 +65,20 @@ def _valid_dns_hostname(host: str) -> bool:
     )
 
 
-def _normalized_remote_path(path: str) -> str | None:
-    candidate = path or "/"
+def _normalized_remote_component(
+    value: str,
+    *,
+    allowed_chars: frozenset[str],
+    empty_default: str,
+) -> str | None:
+    candidate = value or empty_default
     output: list[str] = []
     index = 0
     while index < len(candidate):
         character = candidate[index]
         if character != "%":
+            if character not in allowed_chars:
+                return None
             output.append(character)
             index += 1
             continue
@@ -78,6 +88,8 @@ def _normalized_remote_path(path: str) -> str | None:
         if any(character not in _HEX_DIGITS for character in escape):
             return None
         decoded = chr(int(escape, 16))
+        if ord(decoded) < 0x20 or ord(decoded) == 0x7F:
+            return None
         if decoded in _UNRESERVED_PATH_CHARS:
             output.append(decoded)
         else:
@@ -86,12 +98,22 @@ def _normalized_remote_path(path: str) -> str | None:
     return "".join(output)
 
 
+def _normalized_remote_path(path: str) -> str | None:
+    return _normalized_remote_component(path, allowed_chars=_REMOTE_PATH_CHARS, empty_default="/")
+
+
+def _normalized_remote_query(query: str) -> str | None:
+    return _normalized_remote_component(query, allowed_chars=_REMOTE_QUERY_CHARS, empty_default="")
+
+
 def normalized_remote_mcp_url(value: object) -> str | None:
     if not isinstance(value, str):
         return None
-    candidate = value.strip()
-    if not candidate or not candidate.isascii():
+    if not value or value != value.strip() or not value.isascii():
         return None
+    if any(ord(character) <= 0x20 or ord(character) == 0x7F for character in value):
+        return None
+    candidate = value
     try:
         parsed = urlsplit(candidate)
     except ValueError:
@@ -101,6 +123,7 @@ def normalized_remote_mcp_url(value: object) -> str | None:
         or not parsed.hostname
         or parsed.username is not None
         or parsed.password is not None
+        or parsed.fragment
     ):
         return None
     try:
@@ -125,12 +148,13 @@ def normalized_remote_mcp_url(value: object) -> str | None:
         host = str(address)
     netloc = f"[{host}]" if ":" in host else host
     path = _normalized_remote_path(parsed.path)
-    if path is None:
+    query = _normalized_remote_query(parsed.query)
+    if path is None or query is None:
         return None
     endpoint = urlunsplit(("https", netloc, path, "", ""))
     if len(endpoint) > _REMOTE_MCP_URL_MAX_LENGTH:
         return None
-    return urlunsplit(("https", netloc, path, parsed.query, ""))
+    return urlunsplit(("https", netloc, path, query, ""))
 
 
 def remote_mcp_endpoint_identity(value: object) -> str | None:
