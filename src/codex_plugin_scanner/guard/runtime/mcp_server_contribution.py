@@ -33,9 +33,7 @@ _TOOL_STATES: Final = frozenset({"inherit", "allow", "review", "block"})
 _REMOTE_TOOL_STATES: Final = frozenset({"inherit", "review", "block"})
 _REMOTE_MCP_URL_MAX_LENGTH: Final = 260
 _HEX_DIGITS: Final = frozenset("0123456789abcdefABCDEF")
-_UNRESERVED_PATH_CHARS: Final = frozenset(
-    "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~"
-)
+_UNRESERVED_PATH_CHARS: Final = frozenset("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~")
 
 
 def contributions_dir() -> Path:
