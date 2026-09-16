@@ -32,6 +32,10 @@ _ALLOWED_LAUNCHERS: Final = frozenset({"bunx", "npx", "npm", "pnpm", "uvx", "yar
 _TOOL_STATES: Final = frozenset({"inherit", "allow", "review", "block"})
 _REMOTE_TOOL_STATES: Final = frozenset({"inherit", "review", "block"})
 _REMOTE_MCP_URL_MAX_LENGTH: Final = 260
+_HEX_DIGITS: Final = frozenset("0123456789abcdefABCDEF")
+_UNRESERVED_PATH_CHARS: Final = frozenset(
+    "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~"
+)
 
 
 def contributions_dir() -> Path:
@@ -60,11 +64,35 @@ def _valid_dns_hostname(host: str) -> bool:
     )
 
 
+def _normalized_remote_path(path: str) -> str | None:
+    candidate = path or "/"
+    output: list[str] = []
+    index = 0
+    while index < len(candidate):
+        character = candidate[index]
+        if character != "%":
+            output.append(character)
+            index += 1
+            continue
+        if index + 2 >= len(candidate):
+            return None
+        escape = candidate[index + 1 : index + 3]
+        if any(character not in _HEX_DIGITS for character in escape):
+            return None
+        decoded = chr(int(escape, 16))
+        if decoded in _UNRESERVED_PATH_CHARS:
+            output.append(decoded)
+        else:
+            output.append(f"%{escape.upper()}")
+        index += 3
+    return "".join(output)
+
+
 def normalized_remote_mcp_url(value: object) -> str | None:
     if not isinstance(value, str):
         return None
     candidate = value.strip()
-    if not candidate or len(candidate) > _REMOTE_MCP_URL_MAX_LENGTH or not candidate.isascii():
+    if not candidate or not candidate.isascii():
         return None
     try:
         parsed = urlsplit(candidate)
@@ -98,7 +126,12 @@ def normalized_remote_mcp_url(value: object) -> str | None:
             return None
         host = str(address)
     netloc = f"[{host}]" if ":" in host else host
-    path = parsed.path or "/"
+    path = _normalized_remote_path(parsed.path)
+    if path is None:
+        return None
+    endpoint = urlunsplit(("https", netloc, path, "", ""))
+    if len(endpoint) > _REMOTE_MCP_URL_MAX_LENGTH:
+        return None
     return urlunsplit(("https", netloc, path, parsed.query, ""))
 
 
