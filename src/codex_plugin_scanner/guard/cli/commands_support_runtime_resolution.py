@@ -383,7 +383,7 @@ def _copilot_runtime_server_identity(
 
     server_identity = build_mcp_server_identity(
         config_path=server.config_path,
-        command=command or (normalized_remote_url if has_remote_url else "<unresolved>"),
+        command=normalized_remote_url if has_remote_url else command or "<unresolved>",
         args=launch_args,
         transport=transport,
         env=configured_env,
