@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from codex_plugin_scanner.guard.mcp_tool_calls import build_tool_call_artifact
+from codex_plugin_scanner.guard.models import GuardArtifact
 from codex_plugin_scanner.guard.runtime import mcp_server_grants
 
 
@@ -20,13 +20,16 @@ def test_remote_instapods_matches_server_name_without_runtime_endpoint_identity(
         },
     }
     monkeypatch.setattr(mcp_server_grants, "load_mcp_contribution_payloads", lambda: (payload,))
-    artifact = build_tool_call_artifact(
+    artifact = GuardArtifact(
+        artifact_id="codex:runtime:project:instapods:delete_pod",
+        name="instapods:delete_pod",
         harness="codex",
-        server_name="instapods",
-        tool_name="delete_pod",
+        artifact_type="tool_call",
         source_scope="project",
         config_path=".mcp.json",
+        command="delete_pod",
         transport="sse",
+        metadata={"server_name": "instapods"},
     )
 
     matched = mcp_server_grants.matching_mcp_contribution(artifact)
