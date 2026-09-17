@@ -31,25 +31,23 @@ jobs:
 
           source = Path("src/codex_plugin_scanner/guard/runtime/mcp_server_contribution.py")
           text = source.read_text()
-          old = '    host = parsed.hostname.lower().rstrip(".")\n    if not host:\n'
-          new = (
+          old_line = '    host = parsed.hostname.lower().rstrip(".")\n'
+          replacement = (
               '    raw_host = parsed.hostname.lower()\n'
               '    if raw_host.endswith(".."):\n'
               '        return None\n'
               '    host = raw_host[:-1] if raw_host.endswith(".") else raw_host\n'
-              '    if not host:\n'
           )
-          if old not in text:
-              raise SystemExit("host normalization anchor not found")
-          source.write_text(text.replace(old, new, 1))
+          if old_line not in text:
+              raise SystemExit("host normalization line not found")
+          source.write_text(text.replace(old_line, replacement, 1))
 
           tests = Path("tests/test_guard_remote_mcp_contributions.py")
           text = tests.read_text()
-          anchor = '''def test_remote_http_url_contract_accepts_explicit_standard_https_port() -> None:\n    payload = _remote_payload("https://app.instapods.com:443/api/mcp")\n    validate_mcp_contribution(payload)\n    assert normalized_remote_mcp_url("https://app.instapods.com:443/api/mcp") == "https://app.instapods.com/api/mcp"\n\n\n'''
-          addition = '''def test_remote_http_url_contract_rejects_multiple_trailing_root_dots() -> None:\n    url = "https://app.instapods.com../api/mcp"\n    with pytest.raises(ValueError, match=r"schema|public HTTPS endpoint"):\n        validate_mcp_contribution(_remote_payload(url))\n    assert normalized_remote_mcp_url(url) is None\n\n\n'''
-          if anchor not in text:
-              raise SystemExit("test insertion anchor not found")
-          tests.write_text(text.replace(anchor, anchor + addition, 1))
+          test_name = "test_remote_http_url_contract_rejects_multiple_trailing_root_dots"
+          if test_name not in text:
+              addition = '''\n\ndef test_remote_http_url_contract_rejects_multiple_trailing_root_dots() -> None:\n    url = "https://app.instapods.com../api/mcp"\n    with pytest.raises(ValueError, match=r"schema|public HTTPS endpoint"):\n        validate_mcp_contribution(_remote_payload(url))\n    assert normalized_remote_mcp_url(url) is None\n'''
+              tests.write_text(text.rstrip() + addition + "\n")
           PY
 
           uv sync --frozen --group dev
