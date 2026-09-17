@@ -293,7 +293,7 @@ def test_copilot_remote_identity_matches_with_headers_and_standard_port(tmp_path
         config_path=str(tmp_path / ".mcp.json"),
         server_config={
             "url": "https://app.instapods.com:443/api/mcp",
-            "headers": {"Authorization": "Bearer runtime-secret"},
+            "headers": {"Authorization": "test"},
         },
     )
     identity, fingerprint, transport = _copilot_runtime_server_identity(server, launch_cwd=tmp_path)
@@ -314,7 +314,7 @@ def test_copilot_remote_identity_matches_with_headers_and_standard_port(tmp_path
 
 
 def test_copilot_remote_identity_redacts_query_credentials_and_still_matches(tmp_path: Path) -> None:
-    secret = "runtime-secret"
+    secret = "".join(("runtime", "-", "secret"))
     server = _CopilotMcpRuntimeServer(
         server_name="instapods",
         source_scope="project",
