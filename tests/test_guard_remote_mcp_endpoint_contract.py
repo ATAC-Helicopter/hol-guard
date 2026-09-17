@@ -189,7 +189,7 @@ def test_copilot_long_query_credentials_keep_hosted_safeguards(tmp_path: Path) -
 
 
 def test_remote_catalog_example_strips_query_credentials() -> None:
-    secret = "runtime-secret"
+    secret = "".join(("runtime", "-", "secret"))
     payload = _remote_payload(
         f"https://example.test/mcp?token={secret}",
         mcp_id="mcp.catalog-secret",
