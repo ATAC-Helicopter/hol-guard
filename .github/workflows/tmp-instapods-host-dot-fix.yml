@@ -1,3 +1,4 @@
+# Triggered to apply the branch-local hosted MCP fix and remove this helper.
 name: Temporary InstaPods host normalization fix
 
 on:
