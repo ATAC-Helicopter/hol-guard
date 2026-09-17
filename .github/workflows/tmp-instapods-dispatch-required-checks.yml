@@ -1,0 +1,32 @@
+name: Temporary InstaPods required-check dispatch
+
+on:
+  push:
+    branches:
+      - codex/instapods-remote-mcp-extension
+    paths:
+      - .github/workflows/tmp-instapods-dispatch-required-checks.yml
+
+permissions:
+  contents: read
+
+jobs:
+  dispatch:
+    permissions:
+      actions: write
+      contents: read
+    runs-on: ubuntu-latest
+    steps:
+      - name: Dispatch repository workflows on current branch
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          BRANCH: codex/instapods-remote-mcp-extension
+        run: |
+          set -euo pipefail
+          for workflow in ci.yml security-gates.yml codeql.yml; do
+            gh api \
+              --method POST \
+              "repos/${GH_REPO}/actions/workflows/${workflow}/dispatches" \
+              -f ref="${BRANCH}"
+          done
