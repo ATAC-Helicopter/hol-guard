@@ -388,3 +388,10 @@ def test_remote_http_contribution_rejects_allow_default() -> None:
         assert "cannot declare allow defaults" in str(error)
     else:
         raise AssertionError("remote HTTP contribution accepted an allow default")
+
+
+def test_remote_http_url_contract_rejects_multiple_trailing_root_dots() -> None:
+    url = "https://app.instapods.com../api/mcp"
+    with pytest.raises(ValueError, match=r"schema|public HTTPS endpoint"):
+        validate_mcp_contribution(_remote_payload(url))
+    assert normalized_remote_mcp_url(url) is None

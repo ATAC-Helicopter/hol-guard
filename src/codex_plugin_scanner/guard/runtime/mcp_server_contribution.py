@@ -132,7 +132,10 @@ def normalized_remote_mcp_url(value: object) -> str | None:
         return None
     if port not in {None, 443}:
         return None
-    host = parsed.hostname.lower().rstrip(".")
+    raw_host = parsed.hostname.lower()
+    if raw_host.endswith(".."):
+        return None
+    host = raw_host[:-1] if raw_host.endswith(".") else raw_host
     if not host:
         return None
     try:
