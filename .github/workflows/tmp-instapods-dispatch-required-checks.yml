@@ -10,14 +10,37 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: instapods-required-check-dispatch
+  cancel-in-progress: false
+
 jobs:
   dispatch:
     permissions:
       actions: write
-      contents: read
+      contents: write
     runs-on: ubuntu-latest
     steps:
-      - name: Dispatch repository workflows on current branch
+      - uses: actions/checkout@v4
+        with:
+          ref: codex/instapods-remote-mcp-extension
+          fetch-depth: 0
+
+      - name: Remove helper from branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          BRANCH=codex/instapods-remote-mcp-extension
+          git fetch origin "${BRANCH}"
+          test "$(git rev-parse HEAD)" = "${GITHUB_SHA}"
+          test "$(git rev-parse origin/${BRANCH})" = "${GITHUB_SHA}"
+          git rm .github/workflows/tmp-instapods-dispatch-required-checks.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "ci: remove required-check dispatch helper"
+          git push origin HEAD:"${BRANCH}"
+
+      - name: Dispatch repository workflows on clean branch head
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
