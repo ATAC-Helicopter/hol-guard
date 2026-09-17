@@ -55,12 +55,17 @@ jobs:
       - name: Install dependencies
         run: uv sync --frozen --group dev
 
-      - name: Validate focused hosted MCP repair
-        run: |
-          uv run ruff format src/codex_plugin_scanner/guard/runtime/mcp_server_contribution.py tests/test_guard_remote_mcp_contributions.py
-          uv run ruff check src/codex_plugin_scanner/guard/runtime/mcp_server_contribution.py tests/test_guard_remote_mcp_contributions.py
-          uv run ruff format --check src/codex_plugin_scanner/guard/runtime/mcp_server_contribution.py tests/test_guard_remote_mcp_contributions.py
-          uv run pytest -q tests/test_guard_remote_mcp_contributions.py
+      - name: Format focused files
+        run: uv run ruff format src/codex_plugin_scanner/guard/runtime/mcp_server_contribution.py tests/test_guard_remote_mcp_contributions.py
+
+      - name: Ruff focused files
+        run: uv run ruff check src/codex_plugin_scanner/guard/runtime/mcp_server_contribution.py tests/test_guard_remote_mcp_contributions.py
+
+      - name: Check focused formatting
+        run: uv run ruff format --check src/codex_plugin_scanner/guard/runtime/mcp_server_contribution.py tests/test_guard_remote_mcp_contributions.py
+
+      - name: Run focused hosted MCP tests
+        run: uv run pytest -q tests/test_guard_remote_mcp_contributions.py
 
       - name: Regenerate source-bound decision evidence
         run: |
