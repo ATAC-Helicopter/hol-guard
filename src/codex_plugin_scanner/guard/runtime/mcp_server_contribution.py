@@ -7,7 +7,7 @@ import sys
 from collections.abc import Mapping
 from functools import lru_cache
 from importlib import resources
-from ipaddress import ip_address
+from ipaddress import IPv6Address, ip_address
 from pathlib import Path
 from typing import Final, cast
 from urllib.parse import urlsplit, urlunsplit
@@ -146,6 +146,8 @@ def normalized_remote_mcp_url(value: object) -> str | None:
         if host == "localhost" or host.endswith(".localhost") or "." not in host or not _valid_dns_hostname(host):
             return None
     else:
+        if isinstance(address, IPv6Address) and address.ipv4_mapped is not None:
+            address = address.ipv4_mapped
         if not address.is_global:
             return None
         host = str(address)
