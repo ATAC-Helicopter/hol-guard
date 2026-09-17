@@ -51,6 +51,6 @@ def test_remote_http_endpoint_identity_rejects_above_shared_maximum() -> None:
 
 def test_remote_http_endpoint_identity_rejects_non_ascii_value() -> None:
     url = "https://example.test/mcp/\U0001f512"
-    with pytest.raises(ValueError, match="public HTTPS endpoint"):
+    with pytest.raises(ValueError, match="schema"):
         validate_mcp_contribution(_remote_payload(url))
     assert normalized_remote_mcp_url(url) is None
