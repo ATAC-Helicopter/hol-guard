@@ -98,8 +98,28 @@ def _normalized_remote_component(
     return "".join(output)
 
 
+def _remove_remote_dot_segments(path: str) -> str:
+    segments = path.split("/")
+    resolved: list[str] = []
+    for segment in segments:
+        if segment == "..":
+            if resolved:
+                resolved.pop()
+        elif segment != ".":
+            resolved.append(segment)
+    if segments[-1] in {".", ".."}:
+        resolved.append("")
+    normalized = "/".join(resolved) or "/"
+    if path.startswith("/") and not normalized.startswith("/"):
+        normalized = f"/{normalized}"
+    return normalized
+
+
 def _normalized_remote_path(path: str) -> str | None:
-    return _normalized_remote_component(path, allowed_chars=_REMOTE_PATH_CHARS, empty_default="/")
+    normalized = _normalized_remote_component(path, allowed_chars=_REMOTE_PATH_CHARS, empty_default="/")
+    if normalized is None:
+        return None
+    return _remove_remote_dot_segments(normalized)
 
 
 def _normalized_remote_query(query: str) -> str | None:

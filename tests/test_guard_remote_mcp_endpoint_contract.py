@@ -59,6 +59,45 @@ def test_remote_url_preserves_trailing_slash_route_identity() -> None:
     assert remote_mcp_endpoint_identity(with_slash) == with_slash
 
 
+def test_remote_path_dot_segments_have_one_endpoint_identity() -> None:
+    expected = "https://example.test/api/mcp"
+    variants = (
+        "https://example.test/api/./mcp",
+        "https://example.test/api/%2e/mcp",
+        "https://example.test/api/route/../mcp",
+        "https://example.test/api/route/%2E%2E/mcp",
+    )
+
+    for variant in variants:
+        assert normalized_remote_mcp_url(variant) == expected
+        assert remote_mcp_endpoint_identity(variant) == expected
+
+
+def test_remote_runtime_matches_equivalent_dot_segment_route() -> None:
+    identity = build_mcp_server_identity(
+        config_path=".mcp.json",
+        command="https://example.test/api/route/../mcp",
+        args=(),
+        transport="http",
+    )
+    artifact = build_tool_call_artifact(
+        harness="codex",
+        server_name="example",
+        tool_name="write_data",
+        source_scope="project",
+        config_path=".mcp.json",
+        transport="http",
+        server_identity=identity,
+    )
+    launch = {
+        "kind": "remote-http",
+        "url": "https://example.test/api/mcp",
+        "serverNames": ["example"],
+    }
+
+    assert _matches_remote_http_contribution(artifact, launch)
+
+
 def test_remote_path_percent_escapes_have_one_endpoint_identity() -> None:
     lower = "https://example.test/api/%7euser/a%2fb"
     upper = "https://example.test/api/~user/a%2Fb"
