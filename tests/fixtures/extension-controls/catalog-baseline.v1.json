@@ -6,7 +6,7 @@
     "canonical_diff_digest",
     "effective"
   ],
-  "catalog_digest": "c0b23f157bc4921d1c51c692c4cb039da560bc176ce13a416f8d122c25db2a41",
+  "catalog_digest": "695899ead5c8369287f9ad98ce6a7d095f01b1a8662495a50e86c239399cfa32",
   "control_schema_version": "1.0.0",
   "daemon_api_schema": "guard.daemon.extension-controls.v1",
   "effective_shape": [
@@ -20,7 +20,7 @@
     "failures",
     "projection"
   ],
-  "extension_count": 69,
+  "extension_count": 70,
   "extension_ids": [
     "command.api-gateway",
     "command.backup.borg",
@@ -64,6 +64,7 @@
     "command.messaging.rabbitmq",
     "command.monitoring",
     "command.noodle",
+    "command.ollama",
     "command.package.go",
     "command.package.jvm",
     "command.package.node",
@@ -95,7 +96,7 @@
   "extension_schema_version": 2,
   "installed_browser_config": "dashboard/playwright.installed.config.ts",
   "overview_route": "/extensions",
-  "permission_count": 245,
+  "permission_count": 247,
   "permission_examples": {
     "command.api-gateway.permission.delete": "aws apigateway delete-rest-api",
     "command.backup.borg.permission.mutation": "borg delete",
@@ -267,6 +268,8 @@
     "command.messaging.rabbitmq.permission.delete": "rabbitmqctl delete_queue jobs",
     "command.monitoring.permission.delete": "aws cloudwatch delete-alarms",
     "command.noodle.permission.run": "noodle request run users/get --collection ./my-api",
+    "command.ollama.permission.push": "ollama push",
+    "command.ollama.permission.rm": "ollama rm",
     "command.package.go.permission.package-protection": "go install golang.org/x/tools/cmd/goimports@latest",
     "command.package.jvm.permission.package-protection": "mvn dependency:copy-dependencies",
     "command.package.node.permission.package-protection": "npm install left-pad",
@@ -610,6 +613,8 @@
     "command.messaging.rabbitmq.permission.delete",
     "command.monitoring.permission.delete",
     "command.noodle.permission.run",
+    "command.ollama.permission.push",
+    "command.ollama.permission.rm",
     "command.package.go.permission.package-protection",
     "command.package.jvm.permission.package-protection",
     "command.package.node.permission.package-protection",
@@ -696,7 +701,7 @@
     "controls",
     "semantic_preview"
   ],
-  "rule_count": 232,
+  "rule_count": 234,
   "rule_ids": [
     "command.api-gateway.delete",
     "command.backup.borg.mutation",
@@ -863,6 +868,8 @@
     "command.messaging.rabbitmq.delete",
     "command.monitoring.delete",
     "command.noodle.run",
+    "command.ollama.push",
+    "command.ollama.rm",
     "command.payment.delete",
     "command.platform.heroku.app-destruction",
     "command.platform.heroku.release-change",
