@@ -6,7 +6,7 @@
     "canonical_diff_digest",
     "effective"
   ],
-  "catalog_digest": "695899ead5c8369287f9ad98ce6a7d095f01b1a8662495a50e86c239399cfa32",
+  "catalog_digest": "1d822cce55cbb8afcb6541ea96e70070b36047133249e52bde79c6b31f181901",
   "control_schema_version": "1.0.0",
   "daemon_api_schema": "guard.daemon.extension-controls.v1",
   "effective_shape": [
@@ -20,7 +20,7 @@
     "failures",
     "projection"
   ],
-  "extension_count": 70,
+  "extension_count": 71,
   "extension_ids": [
     "command.api-gateway",
     "command.backup.borg",
@@ -59,6 +59,7 @@
     "command.kubernetes-secrets",
     "command.load-balancer",
     "command.mcp-filesystem",
+    "command.mcp-instapods",
     "command.messaging.kafka",
     "command.messaging.nats",
     "command.messaging.rabbitmq",
@@ -96,7 +97,7 @@
   "extension_schema_version": 2,
   "installed_browser_config": "dashboard/playwright.installed.config.ts",
   "overview_route": "/extensions",
-  "permission_count": 247,
+  "permission_count": 248,
   "permission_examples": {
     "command.api-gateway.permission.delete": "aws apigateway delete-rest-api",
     "command.backup.borg.permission.mutation": "borg delete",
@@ -263,6 +264,7 @@
     "command.kubernetes-secrets.permission.secret-read": "kubectl get secret db-credentials -o yaml",
     "command.load-balancer.permission.delete": "aws elb delete-load-balancer",
     "command.mcp-filesystem.permission.mcp-filesystem-tool": "npx -y @modelcontextprotocol/server-filesystem",
+    "command.mcp-instapods.permission.mcp-instapods-tool": "https://app.instapods.com/api/mcp",
     "command.messaging.kafka.permission.delete": "kafka-topics --delete",
     "command.messaging.nats.permission.delete": "nats str rm ORDERS",
     "command.messaging.rabbitmq.permission.delete": "rabbitmqctl delete_queue jobs",
@@ -608,6 +610,7 @@
     "command.kubernetes-secrets.permission.secret-read",
     "command.load-balancer.permission.delete",
     "command.mcp-filesystem.permission.mcp-filesystem-tool",
+    "command.mcp-instapods.permission.mcp-instapods-tool",
     "command.messaging.kafka.permission.delete",
     "command.messaging.nats.permission.delete",
     "command.messaging.rabbitmq.permission.delete",
