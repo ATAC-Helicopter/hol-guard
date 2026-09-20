@@ -11,6 +11,9 @@ from codex_plugin_scanner.guard.runtime.secret_file_requests import (
 )
 from tests.git_execution_test_support import assert_host_git_proof_result
 from tests.native_command_test_support import (
+    build_tool_action_request_artifact_native_test as build_tool_action_request_artifact,
+)
+from tests.native_command_test_support import (
     extract_sensitive_tool_action_request_native_test as extract_sensitive_tool_action_request,
 )
 from tests.native_command_test_support import inspect_command_native_test as inspect_command
@@ -90,7 +93,8 @@ def test_cached_diff_keeps_separate_host_and_native_repository_proof(
 ) -> None:
     home, repository = _repository(tmp_path)
 
-    assert_host_git_proof_result(_is_benign(command, home=home, repository=repository), cwd=repository)
+    host_proof = _is_benign(command, home=home, repository=repository)
+    assert_host_git_proof_result(host_proof, cwd=repository)
     # On supported hosts the recognizer can inspect this repository, but native
     # pre-tool requests intentionally omit cwd/home and Git configuration.
     # Its missing repository proof must not be replaced by this Python result.
@@ -101,7 +105,9 @@ def test_cached_diff_keeps_separate_host_and_native_repository_proof(
         home_dir=home,
     )
     assert request is not None
-    if native_supported:
+    if native_supported or not host_proof:
+        # Without an executable proof, host discovery keeps its Git diagnostic
+        # even when the native parser rejects the surrounding conditional.
         assert request.action_class == "git index inspection"
     else:
         # The bounded host recognizer cannot discharge an unsupported native
@@ -109,6 +115,11 @@ def test_cached_diff_keeps_separate_host_and_native_repository_proof(
         assert request.action_class == "unmodeled shell command"
         assert request.guard_default_action == "block"
         assert request.reason_code == "native-command-classification-block"
+    if not native_supported:
+        artifact = build_tool_action_request_artifact(
+            "codex", request, config_path="config.toml", source_scope="project"
+        )
+        assert artifact.metadata["command_action_floor"] == "block"
 
 
 def test_unverified_cached_diff_is_owned_by_git_extension(tmp_path: Path) -> None:

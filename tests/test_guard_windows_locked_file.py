@@ -5,6 +5,7 @@ from __future__ import annotations
 import ctypes
 import types
 from pathlib import Path
+from typing import Protocol
 
 import pytest
 
@@ -20,12 +21,18 @@ class _FakeWindowsFunction:
         return self._implementation(*arguments)
 
 
+class _UnicodeOutputBuffer(Protocol):
+    value: str
+
+
 def _fake_kernel32(
     *,
     attributes: int,
     create_arguments: list[tuple[object, ...]],
     closed_handles: list[object],
     create_handles: list[int] | None = None,
+    final_path: str | None = None,
+    final_path_length: int | None = None,
 ) -> object:
     def create_file(*arguments: object) -> int:
         create_arguments.append(arguments)
@@ -43,9 +50,15 @@ def _fake_kernel32(
         closed_handles.append(handle)
         return 1
 
+    def get_final_path(_handle: object, buffer: _UnicodeOutputBuffer, _length: int, flags: int) -> int:
+        assert flags == 0
+        buffer.value = final_path or ""
+        return final_path_length if final_path_length is not None else len(final_path or "")
+
     return types.SimpleNamespace(
         CreateFileW=_FakeWindowsFunction(create_file),
         GetFileInformationByHandle=_FakeWindowsFunction(get_information),
+        GetFinalPathNameByHandleW=_FakeWindowsFunction(get_final_path),
         CloseHandle=_FakeWindowsFunction(close_handle),
     )
 
@@ -58,12 +71,16 @@ def _configure_windows_api(
     create_arguments: list[tuple[object, ...]],
     closed_handles: list[object],
     create_handles: list[int] | None = None,
+    final_path: str | None = None,
+    final_path_length: int | None = None,
 ) -> None:
     kernel32 = _fake_kernel32(
         attributes=attributes,
         create_arguments=create_arguments,
         closed_handles=closed_handles,
         create_handles=create_handles,
+        final_path=final_path,
+        final_path_length=final_path_length,
     )
     fake_msvcrt = types.SimpleNamespace(open_osfhandle=open_osfhandle)
     monkeypatch.setattr(windows_paths_module.os, "name", "nt")
@@ -186,3 +203,80 @@ def test_windows_locked_descriptor_retries_transient_sharing_violation(
     assert len(create_arguments) == 2
     assert retry_delays == [windows_paths_module._WINDOWS_LOCK_RETRY_SECONDS]
     assert closed_handles == []
+
+
+@pytest.mark.parametrize(
+    ("expected", "actual"),
+    [
+        (r"C:\Guard\config.toml", r"\\?\C:\Guard\config.toml"),
+        (r"\\server\share\Guard\config.toml", r"\\?\UNC\server\share\Guard\config.toml"),
+    ],
+)
+def test_windows_locked_descriptor_binds_canonical_drive_and_unc_paths(
+    monkeypatch: pytest.MonkeyPatch, expected: str, actual: str
+) -> None:
+    closed_handles: list[object] = []
+    _configure_windows_api(
+        monkeypatch,
+        attributes=0x20,
+        open_osfhandle=lambda _handle, _flags: 83,
+        create_arguments=[],
+        closed_handles=closed_handles,
+        final_path=actual,
+    )
+
+    assert windows_paths_module.open_windows_locked_regular_descriptor(expected, expected_resolved_path=expected) == 83
+    assert closed_handles == []
+
+
+@pytest.mark.parametrize(
+    "actual",
+    [
+        r"\\?\C:\attacker\config.toml",
+        r"\\?\C:\Guard-other\config.toml",
+        r"\\?\C:\Guard\CONFIG.toml",
+    ],
+)
+def test_windows_locked_descriptor_rejects_wrong_physical_path_before_descriptor_conversion(
+    monkeypatch: pytest.MonkeyPatch, actual: str
+) -> None:
+    closed_handles: list[object] = []
+
+    def forbidden_conversion(_handle: int, _flags: int) -> int:
+        raise AssertionError("a differently resolved file must not become a descriptor")
+
+    _configure_windows_api(
+        monkeypatch,
+        attributes=0x20,
+        open_osfhandle=forbidden_conversion,
+        create_arguments=[],
+        closed_handles=closed_handles,
+        final_path=actual,
+    )
+
+    with pytest.raises(OSError, match="windows_locked_file_path_changed"):
+        windows_paths_module.open_windows_locked_regular_descriptor(
+            r"C:\Guard\config.toml", expected_resolved_path=r"C:\Guard\config.toml"
+        )
+    assert closed_handles == [71]
+
+
+@pytest.mark.parametrize("length", [0, windows_paths_module._WINDOWS_PATH_BUFFER_SIZE])
+def test_windows_locked_descriptor_rejects_failed_or_truncated_final_path(
+    monkeypatch: pytest.MonkeyPatch, length: int
+) -> None:
+    closed_handles: list[object] = []
+    _configure_windows_api(
+        monkeypatch,
+        attributes=0x20,
+        open_osfhandle=lambda _handle, _flags: 83,
+        create_arguments=[],
+        closed_handles=closed_handles,
+        final_path_length=length,
+    )
+
+    with pytest.raises(OSError, match="windows_locked_file_final_path_unavailable"):
+        windows_paths_module.open_windows_locked_regular_descriptor(
+            r"C:\Guard\config.toml", expected_resolved_path=r"C:\Guard\config.toml"
+        )
+    assert closed_handles == [71]

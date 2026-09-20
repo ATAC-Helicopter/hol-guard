@@ -24,6 +24,7 @@ else:  # pragma: no cover - runtime compatibility
 
 from .action_lattice import coerce_guard_action, normalize_guard_action
 from .approval_gate import ApprovalGateGrant, public_config, require_settings_write
+from .config_file_io import read_config_file_bytes
 from .config_mutation import notify_native_policy_mutation, record_posture_change_if_needed
 from .config_preset_support import apply_named_posture_harness_policy
 from .guard_home_state import database_has_custom_extension_state
@@ -485,14 +486,11 @@ def resolve_guard_home_for_user_home(user_home: Path) -> Path:
 
 
 def _read_toml(path: Path) -> dict[str, object]:
-    if not path.is_file():
+    contents = read_config_file_bytes(path.parent, path.name)
+    if contents is None:
         return {}
-    try:
-        with path.open("rb") as handle:
-            payload = tomllib.load(handle)
-        return payload if isinstance(payload, dict) else {}
-    except OSError:
-        return {}
+    payload = tomllib.loads(contents.decode("utf-8"))
+    return payload if isinstance(payload, dict) else {}
 
 
 def _coerce_loaded_receipt_redaction_level(value: object) -> str:

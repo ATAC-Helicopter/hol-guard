@@ -1152,7 +1152,7 @@ clearer UX and an implementation plan with technical references.
 
         assert rc == 1
         assert output["artifact_type"] == "tool_action_request"
-        assert output["policy_action"] == "require-reapproval"
+        assert output["policy_action"] == "block"
         assert "destructive shell command" in output["artifact_name"]
 
     @pytest.mark.usefixtures("native_command_artifact_reviews")
@@ -1397,7 +1397,7 @@ clearer UX and an implementation plan with technical references.
 
         assert rc == 1
         assert output["artifact_type"] == "tool_action_request"
-        assert output["policy_action"] == "require-reapproval"
+        assert output["policy_action"] == "block"
         assert output["approval_requests"] == []
 
     @pytest.mark.usefixtures("native_command_artifact_reviews")
