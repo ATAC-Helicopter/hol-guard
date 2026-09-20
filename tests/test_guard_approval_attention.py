@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import threading
 from pathlib import Path
 
 import pytest
@@ -370,3 +371,111 @@ def test_attention_rejects_directory_alias_substitution_between_authorization_an
 
     with pytest.raises(ConfigFileTrustError):
         coordinator._config_for_requests(requests)
+
+
+@pytest.mark.parametrize("replacement_timing", ["before_validation", "before_read"])
+def test_attention_worker_continues_after_rejected_workspace_without_relaxing_pending_request(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, replacement_timing: str
+) -> None:
+    from codex_plugin_scanner.guard.config_file_io import ConfigFileTrustError
+    from codex_plugin_scanner.guard.directory_path_authority import DirectoryPathTrustError
+    from codex_plugin_scanner.guard.runtime import approval_attention as attention_module
+
+    tmp_path = tmp_path.resolve()
+    root = tmp_path / "guard-root"
+    unsafe_workspace = root / "unsafe-workspace"
+    unsafe_workspace.mkdir(parents=True)
+    (unsafe_workspace / ".hol-guard.toml").write_text('default_action = "block"\n', encoding="utf-8")
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    probe = tmp_path / "link-probe"
+    try:
+        probe.symlink_to(outside, target_is_directory=True)
+        probe.unlink()
+    except OSError as error:
+        pytest.skip(f"symlink creation unavailable: {error}")
+    store, runtime, unsafe_result = _queue_operation(
+        root, harness="pi", severity="medium", request_workspace=unsafe_workspace
+    )
+    _other_store, _other_runtime, healthy_result = _queue_operation(
+        root, harness="codex", severity="medium", request_workspace=root / "healthy-workspace"
+    )
+    opened_urls: list[str] = []
+    opened_healthy = threading.Event()
+    unsafe_url = "http://127.0.0.1:5474/requests/unsafe"
+    healthy_url = "http://127.0.0.1:5474/requests/healthy"
+    now = [100.0]
+
+    def open_url(url: str) -> bool:
+        opened_urls.append(url)
+        if url == healthy_url:
+            opened_healthy.set()
+        return True
+
+    coordinator = ApprovalAttentionCoordinator(
+        store=store, runtime=runtime, opener=open_url, clock=lambda: now[0], cooldown_seconds=0
+    )
+    for result, url in ((unsafe_result, unsafe_url), (healthy_result, healthy_url)):
+        operation = result["operation"]
+        requests = result["approval_requests"]
+        assert isinstance(operation, dict)
+        assert isinstance(requests, list)
+        coordinator.schedule(operation_id=str(operation["operation_id"]), requests=requests, browser_url=url)
+    unsafe_requests = unsafe_result["approval_requests"]
+    unsafe_operation = unsafe_result["operation"]
+    assert isinstance(unsafe_requests, list)
+    assert isinstance(unsafe_operation, dict)
+    unsafe_request = unsafe_requests[0]
+    assert isinstance(unsafe_request, dict)
+    request_id = str(unsafe_request["request_id"])
+    request_before = store.get_approval_request(request_id)
+    operation_id = str(unsafe_operation["operation_id"])
+    operation_before = store.get_guard_operation(operation_id)
+
+    def replace_workspace(target: Path) -> None:
+        unsafe_workspace.rename(tmp_path / "retained-workspace")
+        unsafe_workspace.symlink_to(target, target_is_directory=True)
+
+    if replacement_timing == "before_validation":
+        replace_workspace(Path(tmp_path.anchor))
+    original_load = attention_module.load_guard_config
+    loaded_workspaces: list[Path | None] = []
+
+    def load_after_possible_replacement(guard_home, workspace, **kwargs):
+        loaded_workspaces.append(workspace)
+        assert kwargs["require_canonical_workspace"] is True
+        if workspace == unsafe_workspace:
+            assert replacement_timing == "before_read"
+            replace_workspace(outside)
+        return original_load(guard_home, workspace, **kwargs)
+
+    monkeypatch.setattr(attention_module, "load_guard_config", load_after_possible_replacement)
+    original_config = coordinator._config_for_requests
+    rejected: list[ValueError] = []
+
+    def record_config_rejection(requests):
+        try:
+            return original_config(requests)
+        except ValueError as error:
+            rejected.append(error)
+            raise
+
+    monkeypatch.setattr(coordinator, "_config_for_requests", record_config_rejection)
+    now[0] += 20
+    coordinator.start()
+    try:
+        assert opened_healthy.wait(timeout=5), "a rejected workspace stopped later approval attention"
+        assert coordinator._thread is not None and coordinator._thread.is_alive()
+    finally:
+        assert coordinator.stop()
+
+    expected_error = DirectoryPathTrustError if replacement_timing == "before_validation" else ConfigFileTrustError
+    assert len(rejected) == 1 and isinstance(rejected[0], expected_error)
+    assert opened_urls == [healthy_url]
+    assert None not in loaded_workspaces
+    assert store.get_approval_request(request_id) == request_before
+    assert store.get_guard_operation(operation_id) == operation_before
+    assert request_before is not None and request_before["status"] == "pending"
+    assert request_before["workspace"] == str(unsafe_workspace)
+    assert operation_before is not None and operation_before["status"] == "waiting_on_approval"
+    assert not runtime.has_surface_opened("approval-center", f"approval-request:{request_id}")
