@@ -115,19 +115,36 @@ UIVOID_WRAPPER_REVIEW_COMMANDS: tuple[tuple[str, str], ...] = (
     ("pnpm dlx --silent uivoid create my-app", "command.uivoid.create"),
     ("npx -- uivoid create my-app", "command.uivoid.create"),
     ("npm exec -- uivoid create my-app", "command.uivoid.create"),
+    # A version or dist-tag on the package spec itself (npx uivoid@latest,
+    # npm exec uivoid@1.2.3, ...) previously evaded every wrapper rule, since
+    # ExecutableMatcher's subcommands do exact-token comparison. Closed via
+    # VersionedPackageSubcommandMatcher, a reviewed native-program primitive
+    # that tolerates an `@<version-or-tag>` suffix on one designated token.
+    ("npx uivoid@latest create my-app", "command.uivoid.create"),
+    ("npx uivoid@1.2.3 create my-app", "command.uivoid.create"),
+    ("bunx uivoid@latest create my-app", "command.uivoid.create"),
+    ("npm exec uivoid@1.2.3 create my-app", "command.uivoid.create"),
+    ("pnpm exec uivoid@1.2.3 create my-app", "command.uivoid.create"),
+    ("pnpm dlx uivoid@latest create my-app", "command.uivoid.create"),
+    ("yarn dlx uivoid@latest create my-app", "command.uivoid.create"),
+    ("npx --yes uivoid@latest create my-app", "command.uivoid.create"),
+    ("npm exec --yes uivoid@1.2.3 create my-app", "command.uivoid.create"),
+    ("npx uivoid@latest login --token pat_abc123", "command.uivoid.login"),
+    ("npx uivoid@latest skill --install", "command.uivoid.skill-install"),
+    ("NPX UIVOID@LATEST CREATE MY-APP", "command.uivoid.create"),
 )
 
-# Known gap, not fixed in this extension: a version or dist-tag on the
-# package spec itself (npx uivoid@latest create, npm exec uivoid@1.2.3
-# create) evades every wrapper rule above, since ExecutableMatcher's
-# subcommands do exact-token comparison. Fixing this needs either a new
-# native-command-program-reviewed matcher primitive (native_command_program.py
-# keeps an explicit allowlist of matcher types by design -- introducing an
-# unreviewed one here breaks `scripts/build_native_command_program.py`
-# outright, verified locally) or an existing reviewed primitive that fits
-# this token shape, which none of ExecutableMatcher/ArgumentMatcher/
-# SubcommandOperandPrefixMatcher do. Left for maintainers rather than adding
-# an unreviewed matcher type to close it.
+UIVOID_VERSIONED_PACKAGE_SAFE_COMMANDS: tuple[str, ...] = (
+    # A similarly-named or scoped package must not be treated as uivoid.
+    "npx uivoidx@latest create my-app",
+    "npx @scope/uivoid@latest create my-app",
+    "npx not-uivoid create my-app",
+    # Plain pnpm/yarn (no exec/dlx) runs an already-installed local binary or
+    # script by name, not a resolved package spec; a version suffix there is
+    # not a bypass to close, just an unrecognized script name.
+    "pnpm uivoid@latest create my-app",
+    "yarn uivoid@latest create my-app",
+)
 
 
 def test_uivoid_wrapper_invocations_reach_review(tmp_path: Path) -> None:
@@ -139,6 +156,17 @@ def test_uivoid_wrapper_invocations_reach_review(tmp_path: Path) -> None:
         )
         matched = {item.rule.rule_id for item in observations if item.extension.extension_id == "command.uivoid"}
         assert expected_rule in matched, command
+
+
+def test_uivoid_versioned_package_lookalikes_are_not_matched(tmp_path: Path) -> None:
+    """A different package, scope, or non-spec-resolving runner must not match uivoid rules."""
+
+    for command in UIVOID_VERSIONED_PACKAGE_SAFE_COMMANDS:
+        observations = BUILT_IN_COMMAND_EXTENSION_REGISTRY.observations(
+            parse_shell_command(command, cwd=tmp_path, home_dir=tmp_path)
+        )
+        matched = {item.rule.rule_id for item in observations if item.extension.extension_id == "command.uivoid"}
+        assert not matched, command
 
 
 def test_uivoid_rules_stay_inert_until_enabled(tmp_path: Path) -> None:

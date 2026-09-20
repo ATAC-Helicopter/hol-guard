@@ -62,7 +62,14 @@ def _reviewed_types() -> dict[type[object], str]:
     from .command_platform_extensions import _ZeroOperandFlagMatcher
     from .command_repo2nb_extensions import Repo2nbUnresolvedExpansionMatcher
     from .command_reviewed_literal_matcher import ReviewedLiteralCommandMatcher
-    from .command_rules import AllMatcher, AnyMatcher, ArgumentMatcher, ExecutableMatcher, PipelineMatcher
+    from .command_rules import (
+        AllMatcher,
+        AnyMatcher,
+        ArgumentMatcher,
+        ExecutableMatcher,
+        PipelineMatcher,
+        VersionedPackageSubcommandMatcher,
+    )
     from .command_search_messaging_extensions import CurlElasticsearchDeleteMatcher
     from .command_structured_matchers import (
         EnvironmentNameMatcher,
@@ -73,6 +80,7 @@ def _reviewed_types() -> dict[type[object], str]:
 
     return {
         ExecutableMatcher: "executable.v1",
+        VersionedPackageSubcommandMatcher: "versioned-package-subcommand.v1",
         ExecutablePathSetMatcher: "executable-path-set.v1",
         ArgumentMatcher: "arguments.v1",
         AnyMatcher: "any.v1",

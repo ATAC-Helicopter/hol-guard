@@ -4,7 +4,13 @@ from __future__ import annotations
 
 from .command_extension_matchers import executable_matcher, executable_names, safe_flag_variant
 from .command_extension_specs import CommandExtensionSpec
-from .command_rules import AnyMatcher, CommandSafetyRule, CommandSafeVariant, ExecutableMatcher
+from .command_rules import (
+    AnyMatcher,
+    CommandSafetyRule,
+    CommandSafeVariant,
+    ExecutableMatcher,
+    VersionedPackageSubcommandMatcher,
+)
 
 # Flag surface verified against uivoid-cli 0.2.2 (commander.js, src/cli.ts):
 # 8 flat top-level commands, no nested subcommand tree. create, credentials,
@@ -21,6 +27,13 @@ from .command_rules import AnyMatcher, CommandSafetyRule, CommandSafeVariant, Ex
 # a workspace filter, ...) are declared as interspersed so a flag placed
 # before `uivoid` cannot shift the subcommand prefix and skip review --
 # the same option/flag sets already reviewed for the supabase extension.
+#
+# npx/bunx, npm/pnpm exec, and pnpm/yarn dlx resolve `uivoid` as an npm
+# package spec, so `uivoid@<version-or-tag>` (npx uivoid@latest, npm exec
+# uivoid@1.2.3, ...) is also reviewed via VersionedPackageSubcommandMatcher.
+# `pnpm/yarn uivoid` (no exec/dlx) runs an already-installed local binary or
+# script by name, not a resolved package spec, so no version suffix applies
+# there.
 _RUNNER_OPTIONS_WITH_VALUES: frozenset[str] = frozenset(
     {"--cache", "--call", "--dir", "--filter", "--package", "--reporter", "--workspace", "-C", "-F", "-c", "-p", "-w"}
 )
@@ -28,16 +41,32 @@ _RUNNER_FLAGS: frozenset[str] = frozenset(
     {"--aggregate-output", "--silent", "--stream", "--use-stderr", "--workspace-root", "--yes", "-y"}
 )
 
+UIVOID_ACTION_RISK_CLASSES: dict[str, tuple[str, ...]] = {
+    "uivoid live project creation command": ("destructive_shell", "network_egress"),
+    "uivoid outbound credential rotation command": ("destructive_shell", "network_egress"),
+    "uivoid oauth passthrough configuration command": ("destructive_shell", "network_egress"),
+    "uivoid session credential write command": ("destructive_shell", "network_egress"),
+    "uivoid agent skill install command": ("destructive_shell",),
+}
+
 
 def _uivoid_matchers(
     *subcommands: str,
     required_flags: frozenset[str] = frozenset(),
-) -> tuple[ExecutableMatcher, ...]:
+) -> tuple[ExecutableMatcher | VersionedPackageSubcommandMatcher, ...]:
     return (
         executable_matcher("uivoid", *subcommands, required_flags=required_flags),
         ExecutableMatcher(
             executables=executable_names("npx") | executable_names("bunx"),
             subcommands=("uivoid", *subcommands),
+            required_flags=required_flags,
+            interspersed_options_with_values=_RUNNER_OPTIONS_WITH_VALUES,
+            interspersed_flags=_RUNNER_FLAGS,
+        ),
+        VersionedPackageSubcommandMatcher(
+            executables=executable_names("npx") | executable_names("bunx"),
+            package="uivoid",
+            subcommands=subcommands,
             required_flags=required_flags,
             interspersed_options_with_values=_RUNNER_OPTIONS_WITH_VALUES,
             interspersed_flags=_RUNNER_FLAGS,
@@ -56,9 +85,27 @@ def _uivoid_matchers(
             interspersed_options_with_values=_RUNNER_OPTIONS_WITH_VALUES,
             interspersed_flags=_RUNNER_FLAGS,
         ),
+        VersionedPackageSubcommandMatcher(
+            executables=executable_names("npm") | executable_names("pnpm"),
+            package="uivoid",
+            leading_subcommands=("exec",),
+            subcommands=subcommands,
+            required_flags=required_flags,
+            interspersed_options_with_values=_RUNNER_OPTIONS_WITH_VALUES,
+            interspersed_flags=_RUNNER_FLAGS,
+        ),
         ExecutableMatcher(
             executables=executable_names("pnpm") | executable_names("yarn"),
             subcommands=("dlx", "uivoid", *subcommands),
+            required_flags=required_flags,
+            interspersed_options_with_values=_RUNNER_OPTIONS_WITH_VALUES,
+            interspersed_flags=_RUNNER_FLAGS,
+        ),
+        VersionedPackageSubcommandMatcher(
+            executables=executable_names("pnpm") | executable_names("yarn"),
+            package="uivoid",
+            leading_subcommands=("dlx",),
+            subcommands=subcommands,
             required_flags=required_flags,
             interspersed_options_with_values=_RUNNER_OPTIONS_WITH_VALUES,
             interspersed_flags=_RUNNER_FLAGS,

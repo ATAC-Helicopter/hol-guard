@@ -29,6 +29,7 @@ impl Evaluation<'_> {
         let program = self.program;
         let value = match &program.nodes[index].matcher {
             Matcher::Executable(node) => self.executable(node),
+            Matcher::VersionedPackageSubcommand(node) => self.versioned_package_subcommand(node),
             Matcher::Operand(matcher) => matcher
                 .match_segments_with_deadline(self.command, self.deadline)
                 .map(Arc::from),
@@ -204,6 +205,63 @@ impl Evaluation<'_> {
                     .forbidden_flags
                     .is_disjoint(&semantics.present_flags)
             {
+                evidence.push(index);
+            }
+        }
+        Ok(Arc::from(evidence))
+    }
+
+    /// Matches a launcher executable, a package token, and a fixed
+    /// subcommand suffix, tolerating an npm-style `@<version-or-tag>` suffix
+    /// on the package token. Reuses the same known-option stripping and flag
+    /// semantics as `executable()`; the only new logic is the per-token
+    /// normalization below, mirroring the Python reference implementation.
+    fn versioned_package_subcommand(&self, node: &VersionedPackageSubcommandNode) -> MatchResult {
+        let mut prefix: Vec<String> =
+            Vec::with_capacity(node.leading_subcommands.len() + 1 + node.subcommands.len());
+        prefix.extend(node.leading_subcommands.iter().cloned());
+        prefix.push(node.package.clone());
+        prefix.extend(node.subcommands.iter().cloned());
+        let package_prefix = format!("{}@", node.package);
+        let mut evidence = Vec::new();
+        for (index, segment) in self.command.segments.iter().enumerate() {
+            self.check_deadline()?;
+            if !executable_matches(segment, &node.executables) {
+                continue;
+            }
+            let arguments: Vec<_> = segment
+                .arguments
+                .iter()
+                .map(|value| lowercase_for_ascii_comparison(value))
+                .collect();
+            let filtered = without_options(
+                &arguments,
+                &node.interspersed_options_with_values,
+                &node.interspersed_flags,
+            );
+            let normalized: Vec<String> = filtered
+                .iter()
+                .map(|token| {
+                    if *token == node.package
+                        || (token.starts_with(&package_prefix)
+                            && token.len() > package_prefix.len())
+                    {
+                        node.package.clone()
+                    } else {
+                        token.clone()
+                    }
+                })
+                .collect();
+            if normalized.len() < prefix.len() || normalized[..prefix.len()] != prefix[..] {
+                continue;
+            }
+            let flag_arguments = &normalized[prefix.len()..];
+            let semantics = argument_semantics(
+                flag_arguments,
+                &node.interspersed_options_with_values,
+                &BTreeSet::new(),
+            );
+            if node.required_flags.is_subset(&semantics.present_flags) {
                 evidence.push(index);
             }
         }
