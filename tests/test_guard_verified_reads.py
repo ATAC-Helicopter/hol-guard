@@ -26,7 +26,7 @@ from codex_plugin_scanner.guard.runtime.verified_github_reads import try_read_ve
 from codex_plugin_scanner.guard.runtime.verified_read_execution import try_execute_verified_local_read
 from tests.guard_command_corpus import iter_benign_corpus
 from tests.guard_command_corpus_oracle import iter_benign_oracle
-from tests.native_command_test_support import real_native_command_evaluation
+from tests.native_command_test_support import iter_native_command_evaluations, real_native_command_evaluation
 
 
 def _workspace(tmp_path: Path) -> tuple[Path, Path, Path]:
@@ -46,8 +46,10 @@ def test_every_cdx_060_corpus_case_requires_proof_instead_of_inheriting_allow() 
         if oracle.owner == "CDX-060"
     )
     evaluations = tuple(
-        real_native_command_evaluation(case.command, cwd=Path("workspace"), home_dir=Path("home")).evaluation
-        for case, _oracle in records
+        reviewed.evaluation
+        for reviewed in iter_native_command_evaluations(
+            (case.command for case, _oracle in records), cwd=Path("workspace"), home_dir=Path("home")
+        )
     )
     assert len(evaluations) == 350
     assert {item.minimum_action for item in evaluations} == {"review"}

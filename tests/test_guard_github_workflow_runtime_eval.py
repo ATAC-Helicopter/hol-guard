@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import shlex
 from collections.abc import Mapping
 from dataclasses import replace
 from datetime import datetime, timezone
@@ -336,7 +337,7 @@ def test_workflow_approval_identity_accepts_exact_bytes_restored_after_drift(tmp
     original = b"#!/bin/sh\nexit 0\n"
     executable.write_bytes(original)
     executable.chmod(0o755)
-    command = f"{executable} issue lock 17 --repo example/repo"
+    command = f"{shlex.quote(executable.as_posix())} issue lock 17 --repo example/repo"
     artifact = GuardArtifact(
         artifact_id="codex:project:tool-action:github-restored",
         name="Bash GitHub maintenance",
@@ -356,7 +357,7 @@ def test_workflow_approval_identity_accepts_exact_bytes_restored_after_drift(tmp
         operation = parse_github_workflow_operation(
             parse_shell_command(command),
             repository="example/repo",
-            expected_executable=str(executable),
+            expected_executable=executable.as_posix(),
         )
         assert operation is not None
         base = _descriptor_for_workspace(workspace)

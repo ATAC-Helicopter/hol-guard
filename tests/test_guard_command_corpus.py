@@ -78,7 +78,7 @@ _NATIVE_PAIR_MINIMUM_ACTIONS = {
     "p-package-operation": ("review", "review"),
     "p-shell-data-vs-eval": ("allow", "block"),
     "p-cloud-help-redirection": ("review", "block"),
-    "p-patch-check-vs-apply": ("block", "block"),
+    "p-patch-check-vs-apply": ("review", "block"),
     "p-capability-replay": ("review", "review"),
 }
 
@@ -391,7 +391,7 @@ def test_full_native_evaluation_matches_contract_and_reports_original_oracle_dif
     assert {key: tuple(value) for key, value in rejection_groups.items()} == expected_native_rejection_groups()
     assert report["native_rejection_count"] == 27_084
     assert report["original_oracle_below_count"] == 0
-    assert report["original_oracle_above_count"] == 11_608
+    assert report["original_oracle_above_count"] == 11_558
     assert isinstance(report["elapsed"], int | float) and report["elapsed"] < int(
         load_seed_manifest()["evaluation_budget_seconds"]
     )

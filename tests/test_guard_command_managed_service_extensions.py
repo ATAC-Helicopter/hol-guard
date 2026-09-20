@@ -12,6 +12,7 @@ from tests.native_command_test_support import (
     extract_sensitive_tool_action_request_native_test as extract_sensitive_tool_action_request,
 )
 from tests.native_command_test_support import inspect_command_native_test as inspect_command
+from tests.native_command_test_support import real_native_command_evaluation
 
 MANAGED_SERVICE_REVIEW_CASES: tuple[tuple[str, str, str], ...] = (
     (
@@ -165,21 +166,26 @@ def test_safe_managed_variant_does_not_hide_destructive_segment(tmp_path: Path) 
 
 
 @pytest.mark.parametrize(
-    ("command", "rule_id"),
+    "command",
     [
-        ("stripe products delete prod_123 2> --help", "command.payment.delete"),
-        ("stripe products delete prod_123 2>--help", "command.payment.delete"),
+        "stripe products delete prod_123 2> --help",
+        "stripe products delete prod_123 2>--help",
     ],
 )
 def test_help_redirection_target_does_not_hide_destructive_command(
     command: str,
-    rule_id: str,
     tmp_path: Path,
 ) -> None:
     payload = inspect_command(command, cwd=tmp_path, home_dir=tmp_path)
 
-    assert payload["status"] == "review"
-    assert rule_id in {rule["rule_id"] for rule in payload["rules"]}
+    # Redirect parsing has no exact native evidence yet. A destination named
+    # --help must keep the command blocked, never fabricate a safe variant.
+    assert payload["status"] == "native_unavailable"
+    reviewed = real_native_command_evaluation(command, cwd=tmp_path, home_dir=tmp_path)
+    assert reviewed.native_minimum_action == "block"
+    assert reviewed.evaluation.minimum_action == "block"
+    assert reviewed.evaluation.command.uncertainty_reason == "command_redirect_not_yet_supported"
+    assert not reviewed.evaluation.decision_plane.proof_routes
     assert (
         extract_sensitive_tool_action_request(
             "Shell",

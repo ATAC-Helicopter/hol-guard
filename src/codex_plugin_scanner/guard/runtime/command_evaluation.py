@@ -328,7 +328,18 @@ def evaluate_command(
         if native_explicitly_benign
         else frozenset()
     )
-    native_host_floor_exempt = native_explicitly_benign
+    # A syntax-level benign classification does not bind a read/write executor,
+    # filesystem boundary, or launch identity. These candidates retain their
+    # independent proof requirement even when no extension rule raises a floor.
+    contained_routine_candidate = contained_routine_candidate_factor(command)
+    verified_read_candidate = verified_read_candidate_factor(command)
+    workspace_write_candidates = workspace_write_candidate_factors(command)
+    execution_proof_required = (
+        contained_routine_candidate is not None
+        or verified_read_candidate is not None
+        or bool(workspace_write_candidates)
+    )
+    native_host_floor_exempt = native_explicitly_benign and not execution_proof_required
     for owned in owned_matches:
         if owned.match.rule.rule_id in (
             native_benign_rule_ids | explicitly_enabled_rule_ids | workflow_authorized_rule_ids
@@ -364,12 +375,8 @@ def evaluate_command(
             and (evidence.identity.rule_id not in explicitly_enabled_rule_ids or evidence.uncertainty_reasons)
         )
     )
-    contained_routine_candidate = None if native_host_floor_exempt else contained_routine_candidate_factor(command)
-    verified_read_candidate = None if native_host_floor_exempt else verified_read_candidate_factor(command)
-    workspace_write_candidates = () if native_host_floor_exempt else workspace_write_candidate_factors(command)
-    # A resident-proved benign command has already bound its exact command
-    # text.  Do not recreate a second Python read matcher over that text;
-    # keep the independent read floors for every native non-benign result.
+    # Keep read floors whenever the native result is non-benign or execution
+    # still needs a separate filesystem/launch proof.
     read_factors = (
         ()
         if native_host_floor_exempt
@@ -389,10 +396,9 @@ def evaluate_command(
         if permission is not None
         for capability in permission.typed_capabilities
     )
-    # An exact native benign proof is authoritative for the command itself.
-    # Do not reconstruct Python compatibility floors over that already-bound
-    # command.  Explicit permissions and every non-benign native result still
-    # flow through the ordinary critical-floor path below.
+    # Syntax classification cannot waive a candidate's execution proof. Other
+    # exact native benign commands retain their existing classification;
+    # permissions and non-benign commands keep the independent critical floors.
     critical_floor_factors = (
         ()
         if native_host_floor_exempt
@@ -447,10 +453,14 @@ def evaluate_command(
             compatibility_rule=compatibility_rule,
         )
     )
-    native_classification_factors = _native_classification_factors(native_extension_evidence, command)
+    native_classification_factors = _native_classification_factors(
+        native_extension_evidence, command, allow_benign_proof=not execution_proof_required
+    )
     baseline_factors = (
         *native_classification_factors,
         *baseline_decision_factors,
+        *((contained_routine_candidate,) if contained_routine_candidate is not None else ()),
+        *((verified_read_candidate,) if verified_read_candidate is not None else ()),
         *workspace_write_candidates,
         *baseline_critical_floor_factors,
     )
@@ -550,6 +560,8 @@ def evaluate_command(
 def _native_classification_factors(
     value: object,
     command: CanonicalCommand,
+    *,
+    allow_benign_proof: bool = True,
 ) -> tuple[DecisionFactor, ...]:
     """Carry native hard blocks and benign proof into host policy composition.
 
@@ -560,12 +572,17 @@ def _native_classification_factors(
     if not isinstance(value, dict):
         return ()
     blocked = value.get("minimum_action") == "block"
+    privileged_wrapper_reapproval = (
+        value.get("minimum_action") == "require-reapproval"
+        and value.get("reason_code") == "native_privileged_wrapper_reapproval"
+    )
     explicitly_benign = (
-        command.confidence == "exact"
+        allow_benign_proof
+        and command.confidence == "exact"
         and value.get("minimum_action") == "allow"
         and value.get("explicitly_benign") is True
     )
-    if not blocked and not explicitly_benign:
+    if not blocked and not privileged_wrapper_reapproval and not explicitly_benign:
         return ()
     digest = hashlib.sha256(
         json.dumps(
@@ -573,7 +590,9 @@ def _native_classification_factors(
                 "schema": "guard.native-classification-projection.v1",
                 "command_security_identity": command.security_identity,
                 "command_extensions": value["command_extensions"],
-                "minimum_action": "block" if blocked else "allow",
+                "minimum_action": (
+                    "block" if blocked else "require-reapproval" if privileged_wrapper_reapproval else "allow"
+                ),
                 "explicitly_benign": explicitly_benign,
             },
             sort_keys=True,
@@ -586,6 +605,16 @@ def _native_classification_factors(
                 source=DecisionFactorSource.ASSURANCE,
                 reason_code="native.classification-block",
                 basis=DecisionBasis("block", None),
+                producer_ref="native:command-classification",
+                evidence_digest=digest,
+            ),
+        )
+    if privileged_wrapper_reapproval:
+        return (
+            DecisionFactor(
+                source=DecisionFactorSource.ASSURANCE,
+                reason_code="native.privileged-wrapper-reapproval",
+                basis=DecisionBasis("require-reapproval", None),
                 producer_ref="native:command-classification",
                 evidence_digest=digest,
             ),

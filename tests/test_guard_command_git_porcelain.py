@@ -29,7 +29,9 @@ GIT_PORCELAIN_REVIEW_CASES: tuple[tuple[str, str, str], ...] = (
 
 def test_git_porcelain_mutating_commands_are_reviewed(tmp_path: Path) -> None:
     wrapper_cases = {case[0] for case in GIT_PORCELAIN_REVIEW_CASES if case[0].startswith("zsh -lc")}
-    assert_reviewed_command_cases(tuple(case for case in GIT_PORCELAIN_REVIEW_CASES if case[0] not in wrapper_cases), tmp_path)
+    assert_reviewed_command_cases(
+        tuple(case for case in GIT_PORCELAIN_REVIEW_CASES if case[0] not in wrapper_cases), tmp_path
+    )
     for command in wrapper_cases:
         assert real_native_command_evaluation(command, cwd=tmp_path).native_minimum_action == "block"
 
@@ -52,7 +54,7 @@ def test_git_reads_and_nonforce_pushes_keep_their_native_floors(tmp_path: Path) 
     for command in GIT_PORCELAIN_SAFE_COMMANDS:
         evaluation = real_native_command_evaluation(command, cwd=tmp_path).evaluation
         expected = "allow" if command == "git ls-files" else "review"
-        assert evaluation.minimum_action == expected
+        assert evaluation.minimum_action == expected, command
 
 
 def test_git_catalog_lists_everyday_porcelain_commands() -> None:

@@ -10,6 +10,7 @@ mod command_structured_matchers;
 mod executable_flag_contract;
 pub mod native_command_controls;
 pub mod native_command_program;
+mod parser_wrappers;
 pub mod pretool;
 
 use serde::{Deserialize, Serialize};
@@ -140,6 +141,11 @@ pub fn parse_command(request: &CommandModelRequestV1) -> Result<CanonicalCommand
             environment_names.push(name.to_owned());
             executable_index += 1;
         }
+        let (executable_index, wrapper_chain) =
+            match parser_wrappers::unwrap_sudo(&tokens, executable_index) {
+                Ok(value) => value,
+                Err(reason) => return Ok(uncertain(request, raw, reason)),
+            };
         let executable = tokens.get(executable_index).cloned();
         let arguments = if executable.is_some() {
             tokens[executable_index + 1..].to_vec()
@@ -149,7 +155,14 @@ pub fn parse_command(request: &CommandModelRequestV1) -> Result<CanonicalCommand
         if executable.as_deref().is_some_and(is_shell_control_keyword) {
             return Ok(uncertain(request, raw, "compound_shell_not_yet_supported"));
         }
-        if executable.as_deref().is_some_and(is_transparent_wrapper) {
+        if executable.as_deref().is_some_and(is_transparent_wrapper)
+            && !parser_wrappers::is_encoded_stdin_shell(
+                executable.as_deref(),
+                &arguments,
+                &raw_segment,
+                segments.last(),
+            )
+        {
             return Ok(uncertain(
                 request,
                 raw,
@@ -173,7 +186,7 @@ pub fn parse_command(request: &CommandModelRequestV1) -> Result<CanonicalCommand
             executable,
             arguments,
             environment_names,
-            wrapper_chain: Vec::new(),
+            wrapper_chain,
             path_overridden,
             execution_context: format!("top:{}", raw_segment.group_index),
             pipeline_index: raw_segment.pipeline_index,
@@ -186,18 +199,27 @@ pub fn parse_command(request: &CommandModelRequestV1) -> Result<CanonicalCommand
     }
 
     let path_overridden = segments.iter().any(|segment| segment.path_overridden);
+    let wrapper_chain = segments
+        .iter()
+        .flat_map(|segment| segment.wrapper_chain.iter().cloned())
+        .collect::<Vec<_>>();
+    let parser_profile = if wrapper_chain.is_empty() {
+        "posix-simple-v1"
+    } else {
+        "posix-bounded-wrappers-v2"
+    };
     Ok(CanonicalCommandV1 {
         exact_raw_text: true,
         normalized_text: raw.to_owned(),
         dialect: request.dialect.clone(),
         transport: request.transport.clone(),
         extraction_provenance: request.extraction_provenance.clone(),
-        wrapper_chain: Vec::new(),
+        wrapper_chain,
         segments,
         confidence: "exact".to_owned(),
         uncertainty_reason: None,
         path_overridden,
-        parser_profile: "posix-simple-v1".to_owned(),
+        parser_profile: parser_profile.to_owned(),
     })
 }
 
@@ -264,6 +286,9 @@ fn split_execution_segments(command: &str) -> Result<Vec<RawSegment>, &'static s
             '$' if chars.get(index + 1) == Some(&'(') => {
                 return Err("command_substitution_not_yet_supported");
             }
+            '$' if chars.get(index + 1) == Some(&'{') => {
+                return Err("parameter_expansion_not_yet_supported");
+            }
             '$' if chars
                 .get(index + 1)
                 .is_some_and(|next| *next == '\'' || *next == '"') =>
@@ -272,7 +297,17 @@ fn split_execution_segments(command: &str) -> Result<Vec<RawSegment>, &'static s
             }
             '<' | '>' if is_stderr_to_stdout_redirect(&chars, index) => {}
             '<' | '>' => return Err("command_redirect_not_yet_supported"),
-            '(' | ')' | '{' | '}' => return Err("compound_shell_not_yet_supported"),
+            '(' | ')' => return Err("compound_shell_not_yet_supported"),
+            '{' | '}'
+                if (index == 0
+                    || is_shell_token_whitespace(chars[index - 1])
+                    || matches!(chars[index - 1], ';' | '&' | '|'))
+                    && chars.get(index + 1).is_none_or(|value| {
+                        is_shell_token_whitespace(*value) || matches!(*value, ';' | '&' | '|')
+                    }) =>
+            {
+                return Err("compound_shell_not_yet_supported");
+            }
             '&' => {
                 if is_stderr_to_stdout_redirect(&chars, index) {
                     index += 1;
@@ -745,7 +780,7 @@ mod tests {
             "cat <<EOF",
             "echo hello > out.txt",
             "sleep 1 &",
-            "sudo rm -rf /tmp/example",
+            "sudo -s rm -rf /tmp/example",
             "sh -c 'rm -rf /tmp/example'",
             "eval 'rm -rf /tmp/example'",
             "if true; then echo yes; fi",

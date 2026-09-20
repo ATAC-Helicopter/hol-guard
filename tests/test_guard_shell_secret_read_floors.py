@@ -292,7 +292,7 @@ def test_path_object_construction_is_not_a_file_read(tmp_path: Path) -> None:
 
 
 def test_absolute_interpreter_script_operand_requires_review(tmp_path: Path) -> None:
-    command = f"{Path('/usr/bin/python3')} issue lock 17 --repo example/repo"
+    command = "/usr/bin/python3 issue lock 17 --repo example/repo"
     result = assess_shell_reads(command, cwd=tmp_path, home_dir=tmp_path)
     assert result.requires_review
     evaluation, error = _evaluate_native(command, cwd=tmp_path)

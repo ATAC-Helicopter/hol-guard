@@ -31,12 +31,12 @@ def _native_inspection(
     ("command", "expected_status", "expected_match"),
     [
         ("git clean --no-dry-run -nfdx", "no_match", False),
-        # Frozen native baseline keeps both push observations effective. The
-        # retired Python matcher treated the final --dry-run as permissive.
-        ("git push origin main --force --no-dry-run --dry-run", "review", True),
+        # The last effective flag wins for both preview spellings. Native
+        # execution still has a separate review floor, asserted below.
+        ("git push origin main --force --no-dry-run --dry-run", "no_match", False),
     ],
 )
-def test_real_native_git_preview_order_matches_frozen_baseline(
+def test_real_native_git_preview_order_matches_effective_flags(
     command: str,
     expected_status: str,
     expected_match: bool,
@@ -46,6 +46,12 @@ def test_real_native_git_preview_order_matches_frozen_baseline(
     payload, match = _native_inspection(command, tmp_path, monkeypatch)
     assert payload["status"] == expected_status
     assert (match is not None) is expected_match
+    if command.startswith("git push"):
+        reviewed = real_native_command_evaluation(command, cwd=tmp_path)
+        assert reviewed.native_minimum_action == "review"
+        assert reviewed.evaluation.minimum_action == "review"
+        assert reviewed.payload["explicitly_benign"] is False
+        assert not reviewed.evaluation.decision_plane.proof_routes
 
 
 @pytest.mark.parametrize(

@@ -12,26 +12,24 @@ impl NativeCommandProgram {
         let compatibility =
             crate::command_compatibility::compatibility_observations(command, deadline)?;
         let mut batch = self.observe_declarative(command, active_extensions, deadline)?;
-        for matched in compatibility.rule_matches {
-            let declared_safe_variant = batch.observations.iter().any(|observation| {
-                observation.effective_segment_indexes.is_empty()
-                    && observation
-                        .safe_variants
-                        .iter()
-                        .flat_map(|variant| {
+        for mut matched in compatibility.rule_matches {
+            // Safe evidence is both capability- and segment-scoped. A preview
+            // in one segment cannot suppress its destructive sibling, and a
+            // CLI's help predicate cannot erase a separate capability whose
+            // semantics deliberately still require review for trailing help.
+            matched.segment_indexes.retain(|segment| {
+                !batch.observations.iter().any(|observation| {
+                    safe_variant_covers_compatibility(matched.rule_id, &observation.rule_id)
+                        && !observation.effective_segment_indexes.contains(segment)
+                        && observation.safe_variants.iter().any(|variant| {
                             variant
                                 .matcher_evidence
                                 .iter()
-                                .map(|evidence| evidence.segment_index)
+                                .any(|evidence| evidence.segment_index == *segment)
                         })
-                        .collect::<BTreeSet<_>>()
-                        .is_superset(&matched.segment_indexes.iter().copied().collect())
+                })
             });
-            if declared_safe_variant {
-                // A generated source rule already proved this same segment is
-                // a safe variant.  Do not retain an older matcher-less
-                // compatibility attribution that would turn the proof into
-                // an uncertainty or a review floor.
+            if matched.segment_indexes.is_empty() {
                 continue;
             }
             let rule = self
@@ -233,6 +231,19 @@ impl NativeCommandProgram {
             observations,
             ..Default::default()
         })
+    }
+}
+
+fn safe_variant_covers_compatibility(compatibility: &str, declarative: &str) -> bool {
+    match compatibility {
+        "command.git.push" => declarative == "command.git.force-push",
+        "command.container-runtime.docker-sensitive" => {
+            declarative.starts_with("command.container-runtime.")
+        }
+        "command.kubernetes-secrets.secret-read" => {
+            declarative.starts_with("command.kubernetes-operations.")
+        }
+        _ => false,
     }
 }
 

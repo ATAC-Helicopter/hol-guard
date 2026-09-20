@@ -207,7 +207,11 @@ fn exfiltration_command(value: &str) -> bool {
 }
 
 fn exact_safe_command(model: &CanonicalCommandV1, allow_git_helper_context: bool) -> bool {
-    if model.confidence != "exact" || model.path_overridden || model.segments.is_empty() {
+    if model.confidence != "exact"
+        || model.path_overridden
+        || model.segments.is_empty()
+        || !model.wrapper_chain.is_empty()
+    {
         return false;
     }
     model.segments.iter().all(|segment| {
@@ -236,7 +240,11 @@ fn exact_safe_command(model: &CanonicalCommandV1, allow_git_helper_context: bool
 }
 
 fn exact_destructive_tool_introspection(model: &CanonicalCommandV1) -> bool {
-    if model.confidence != "exact" || model.path_overridden || model.segments.is_empty() {
+    if model.confidence != "exact"
+        || model.path_overridden
+        || model.segments.is_empty()
+        || !model.wrapper_chain.is_empty()
+    {
         return false;
     }
     model.segments.iter().all(|segment| {
@@ -275,6 +283,14 @@ pub fn evaluate_pre_tool(request: &CommandModelRequestV1) -> Result<PreToolDecis
             "block",
             "native_secret_exfiltration",
             "HOL Guard blocked a command that combines sensitive data access with network transfer.",
+        ));
+    }
+    if !model.wrapper_chain.is_empty() {
+        return Ok(pretool_decision(
+            model,
+            "require-reapproval",
+            "native_privileged_wrapper_reapproval",
+            "HOL Guard requires fresh approval for the privileged execution context.",
         ));
     }
     if exact_safe_command(&model, false) {

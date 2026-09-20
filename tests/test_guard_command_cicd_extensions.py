@@ -116,7 +116,12 @@ def test_cicd_safe_variant_does_not_hide_destructive_segment(tmp_path: Path) -> 
         home_dir=tmp_path,
     )
 
-    assert [rule["rule_id"] for rule in payload["rules"]] == ["command.cicd.github.workflow-disable"]
+    # Both independently owned native capabilities remain visible. The glab
+    # preview cannot hide either review of the destructive GitHub segment.
+    assert [rule["rule_id"] for rule in payload["rules"]] == [
+        "command.cicd.github.workflow-disable",
+        "command.github.workflow",
+    ]
 
 
 def test_cicd_extensions_publish_primary_references() -> None:

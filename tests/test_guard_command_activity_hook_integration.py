@@ -192,7 +192,7 @@ def test_same_request_id_with_changed_decision_is_a_counted_conflict(tmp_path: P
 def test_unsupported_native_wrapper_records_no_fabricated_rule_ids(tmp_path: Path) -> None:
     guard_home = tmp_path / "guard-home"
     store = _store(guard_home)
-    command = "sudo --command-timeout 10 git push origin main --force"
+    command = "sudo -u alternate-user git push origin main --force"
     payload: dict[str, object] = {
         "tool_name": "Shell",
         "tool_input": {"command": command},

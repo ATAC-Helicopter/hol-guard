@@ -275,7 +275,7 @@ def _generate_decision_diff_report() -> tuple[dict[str, object], float]:
         "scope": {
             "baseline": "reviewed-native-engine-and-current-host-effect-decision",
             "original_oracle": "immutable-original-labels-with-all-native-differences-reported",
-            "parser_grammar": "bounded-upstream-parser-update-with-preserved-inherited-limitations",
+            "parser_grammar": "bounded-reviewed-parser-and-classifier-updates-with-explicit-contract-changes",
             "bounded_parser_update_commit": "5a076ded9182f4466b875effffae3b156fba9e04",
             "authority": "offline-native-evidence-not-authenticated-execution-receipts",
         },

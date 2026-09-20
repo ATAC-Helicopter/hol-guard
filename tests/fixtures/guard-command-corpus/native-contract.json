@@ -778,32 +778,16 @@
       "variant_remainder": 0
     },
     {
-      "basis": "inherited Git plumbing fallback attributes all fifteen compatibility owners as uncertain",
+      "basis": "Reviewed exact git rev-parse --show-toplevel grammar removes unrelated compatibility owners; native execution remains review with no allow proof.",
       "expected": {
-        "decision_plane_floor": "block",
+        "decision_plane_floor": "review",
         "evaluation_error": null,
         "model_confidence": "exact",
         "model_uncertainty": null,
-        "native_floor": "block",
-        "native_reason": "native_command_extension_uncertain",
+        "native_floor": "review",
+        "native_reason": "native_command_review_required",
         "path_overridden": false,
-        "uncertain_rule_ids": [
-          "command.git.blame",
-          "command.git.branch",
-          "command.git.clone",
-          "command.git.describe",
-          "command.git.diff",
-          "command.git.fetch",
-          "command.git.grep",
-          "command.git.log",
-          "command.git.ls-files",
-          "command.git.pull",
-          "command.git.push",
-          "command.git.reflog",
-          "command.git.remote",
-          "command.git.show",
-          "command.git.status"
-        ]
+        "uncertain_rule_ids": []
       },
       "group_id": "workflow:navigation-public-read:repository-root|all",
       "membership": {
@@ -1298,32 +1282,16 @@
       "variant_remainder": 0
     },
     {
-      "basis": "inherited Git apply fallback attributes all fifteen compatibility owners as uncertain",
+      "basis": "Reviewed git apply --check literal relative patch path removes unrelated compatibility owners; independent patch-read and workspace proofs and native review remain required.",
       "expected": {
-        "decision_plane_floor": "block",
+        "decision_plane_floor": "review",
         "evaluation_error": null,
         "model_confidence": "exact",
         "model_uncertainty": null,
-        "native_floor": "block",
-        "native_reason": "native_command_extension_uncertain",
+        "native_floor": "review",
+        "native_reason": "native_command_review_required",
         "path_overridden": false,
-        "uncertain_rule_ids": [
-          "command.git.blame",
-          "command.git.branch",
-          "command.git.clone",
-          "command.git.describe",
-          "command.git.diff",
-          "command.git.fetch",
-          "command.git.grep",
-          "command.git.log",
-          "command.git.ls-files",
-          "command.git.pull",
-          "command.git.push",
-          "command.git.reflog",
-          "command.git.remote",
-          "command.git.show",
-          "command.git.status"
-        ]
+        "uncertain_rule_ids": []
       },
       "group_id": "workflow:workspace-patch-write:patch-check|all",
       "membership": {
@@ -1360,16 +1328,18 @@
       "rust/crates/guard-command/src/command_compatibility.rs": {
         "baseline_git_blob": "4cc8d7ccdaa97ad49cb7a4e0bdae6dee04930431",
         "baseline_sha256": "12d74f5afa697c20ecb2af2b9539b1de2a38a812efba6ee13a37446579889255",
-        "byte_identical": true,
-        "candidate_git_blob": "4cc8d7ccdaa97ad49cb7a4e0bdae6dee04930431",
-        "candidate_sha256": "12d74f5afa697c20ecb2af2b9539b1de2a38a812efba6ee13a37446579889255"
+        "byte_identical": false,
+        "candidate_git_blob": "4a7ba531300a7d9938f3922a744520a27dadcd28",
+        "candidate_sha256": "7815628c58822adc116167578845b94ccb498a620be32270811248d1d074f91d",
+        "reviewed_change": "Admit only parser-recorded sudo wrappers; other wrapper/context uncertainty is unchanged."
       },
       "rust/crates/guard-command/src/command_compatibility/domains.rs": {
         "baseline_git_blob": "9b3e5b7dfa3c418ac4710fdfc143adf6a54f23d8",
         "baseline_sha256": "1499f4ec9c0ee73dce6f3d3a8c2980046d4e41b8c8220174a1fe744aeb4f07ed",
         "byte_identical": false,
-        "candidate_git_blob": "22570499ad7c0097d99eaa9b3929ab9d4a03d350",
-        "candidate_sha256": "2b234ccab67b4357fa0788b7d5b6a092d07c6ea98d15daf7cdcc0fa6acb312e4",
+        "candidate_git_blob": "e5538ac02c9378ddad3ef633ab384e56ca0a389b",
+        "candidate_sha256": "22dd9e12e4c7561acb32bab664733cfd73977d1aabfc395b0e5b241d70edc114",
+        "reviewed_change": "Bound interpreter environment attribution, destructive help/version, and rejected Compose rmi values; execution review remains independent.",
         "upstream_change": "bounded-stderr-redirect-and-exact-cd-find-py-compile-support",
         "upstream_change_commit": "5a076ded9182f4466b875effffae3b156fba9e04"
       },
@@ -1377,8 +1347,9 @@
         "baseline_git_blob": "12d088858e8e37cc2e85b12a2f1f26e045009751",
         "baseline_sha256": "dec9c3dd132d33316ad4f935b390a5a6e0fdb22816b383791656fbb36cfb4a89",
         "byte_identical": false,
-        "candidate_git_blob": "6c1cc6e0c85e1078a906a5ab78ef17c8c9b2ff44",
-        "candidate_sha256": "8782e12dca06ab7d6c22b9c08c09de255901811d707739f5c0cf98bcbe6d3a9e"
+        "candidate_git_blob": "b75a85c34645edacc4a620367928f74dcfeb7114",
+        "candidate_sha256": "e56f4805dbeff9f4894d0ecb2194c707e83552dbe96f123bdb4ab4e24ca0cc04",
+        "reviewed_change": "The exact rev-parse --show-toplevel and apply --check literal-relative-path grammars avoid unrelated uncertain owners; intrinsic review remains."
       },
       "rust/crates/guard-command/src/command_compatibility/github.rs": {
         "baseline_git_blob": "0f7c32c741bb0fee2ff9fcf98b58246033b4cac9",
@@ -1394,6 +1365,12 @@
         "candidate_git_blob": "905bb6ac282939b95d2842fc136087b4a5cf463f",
         "candidate_sha256": "b7d9b5cb03ce1fdedb96abbe25bea590ad44d5e00c14c21bd3f42e40352507da"
       },
+      "rust/crates/guard-command/src/command_compatibility/interpreter.rs": {
+        "byte_identical": false,
+        "candidate_git_blob": "6a670366ba38be2818005dd820da8252f28043df",
+        "candidate_sha256": "fbef078baff4a8bf861a9f8014170c1001e2a41e5cfc954001e3821dc621590f",
+        "reviewed_change": "Closed interpreter literal/public-environment/Artisan forms avoid invented secret ownership; unmodeled programs retain uncertainty."
+      },
       "rust/crates/guard-command/src/command_option_parsing.rs": {
         "baseline_git_blob": "1088dee6717e4beb216a1d62de6d71e5730589f5",
         "baseline_sha256": "a483ff6b493de0270d44a25d4553ebf35f08092b47846f1e262dd72d9bf1c989",
@@ -1405,12 +1382,19 @@
         "baseline_git_blob": "96c8675f0b7b86e7463867ec5ac65fded42d1b09",
         "baseline_sha256": "67fd0552f32a3fe7c87bd9e2aa408a02a5f77ca22fdf9c5608f748db29ee965c",
         "byte_identical": false,
-        "candidate_git_blob": "b4e5304bd52d7c4b453243c7b93a4e49297f8ce2",
-        "candidate_sha256": "f65d36bd2e2aa5090a09de6e77526f80d73c47ed4d77b5663d841410ffcb1cee",
+        "candidate_git_blob": "3250e203736f84038384325ec664d501ef2328eb",
+        "candidate_sha256": "b4affe45972df7809d8efe679d449e9f676e5eb6ee2e81911cdabdfb171c8e8a",
+        "reviewed_change": "Bound sudo extraction and decoder-to-shell pipelines; distinguish literal argument braces from unsupported parameter expansion and shell groups.",
         "upstream_change": "bounded-stderr-redirect-and-exact-cd-find-py-compile-support",
         "upstream_change_commit": "5a076ded9182f4466b875effffae3b156fba9e04",
         "upstream_style_change": "map_or-true-to-is_none_or-preserves-parser-predicate",
         "upstream_style_change_commit": "5db89d51a51f3b5ede9ec9ad2d76f9a0e58aaf4a"
+      },
+      "rust/crates/guard-command/src/parser_wrappers.rs": {
+        "byte_identical": false,
+        "candidate_git_blob": "0cf34d2c73b704d00f51d159bf370dac8a06ed79",
+        "candidate_sha256": "2a2e194250f179601774d7620b4bf9d35b899ad0d40218e20a495344726f1cc4",
+        "reviewed_change": "Bound sudo options and encoded stdin shell forms preserve raw source and wrapper evidence; unknown execution modes remain uncertain."
       }
     }
   },
@@ -1419,12 +1403,14 @@
   "totals": {
     "below_original_oracle": 0,
     "cases": 51000,
-    "equal_to_original_oracle": 39392,
+    "equal_to_original_oracle": 39442,
     "groups": 58,
+    "improved_bounded_git_cases": 50,
+    "improved_bounded_git_sources": 2,
     "improved_upstream_benign_cases": 75,
     "improved_upstream_benign_sources": 3,
     "native_evaluation_errors": 27084,
     "sources": 52,
-    "stronger_than_original_oracle": 11608
+    "stronger_than_original_oracle": 11558
   }
 }

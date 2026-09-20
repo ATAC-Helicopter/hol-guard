@@ -437,7 +437,12 @@ fn evaluate_signals(
         if action_type == PreToolActionTypeV1::Command {
             // A benign command proves only its command text. Independent
             // structured paths still describe the action the tool will take.
-            if signals.sensitive_target {
+            if signals.sensitive_target
+                && matches!(
+                    command_decision.minimum_action.as_str(),
+                    "allow" | "warn" | "review"
+                )
+            {
                 return generic_result(
                     action,
                     "review",
