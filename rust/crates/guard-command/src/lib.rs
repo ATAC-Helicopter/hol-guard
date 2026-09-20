@@ -641,11 +641,74 @@ fn is_nested_command_executor(executable: &str, arguments: &[String]) -> bool {
     ) {
         return true;
     }
+    if matches!(basename, "fd" | "fd.exe") {
+        return fd_arguments_execute_command(arguments);
+    }
     basename == "find"
         && !is_contained_compile_check_arguments(arguments)
         && arguments
             .iter()
             .any(|argument| matches!(argument.as_str(), "-exec" | "-execdir" | "-ok" | "-okdir"))
+}
+
+fn fd_arguments_execute_command(arguments: &[String]) -> bool {
+    // fd substitutes filesystem search results into a subprocess invocation.
+    // Its exec modes need their own bounded source and execution proof; an
+    // exact shell tokenization must not silently treat them as a plain search.
+    let mut arguments = arguments.iter();
+    while let Some(argument) = arguments.next() {
+        if argument == "--" {
+            return false;
+        }
+        if matches!(argument.as_str(), "--exec" | "--exec-batch")
+            || argument.starts_with("--exec=")
+            || argument.starts_with("--exec-batch=")
+        {
+            return true;
+        }
+        if argument.starts_with("--") {
+            if matches!(
+                argument.as_str(),
+                "--base-directory"
+                    | "--changed-after"
+                    | "--changed-before"
+                    | "--changed-within"
+                    | "--color"
+                    | "--exact-depth"
+                    | "--exclude"
+                    | "--extension"
+                    | "--format"
+                    | "--ignore-file"
+                    | "--max-depth"
+                    | "--max-results"
+                    | "--min-depth"
+                    | "--owner"
+                    | "--path-separator"
+                    | "--search-path"
+                    | "--size"
+                    | "--threads"
+                    | "--type"
+            ) {
+                arguments.next();
+            }
+            continue;
+        }
+        let Some(cluster) = argument.strip_prefix('-') else {
+            continue;
+        };
+        for (offset, flag) in cluster.char_indices() {
+            if matches!(flag, 'x' | 'X') {
+                return true;
+            }
+            if matches!(flag, 'c' | 'd' | 'E' | 'e' | 'j' | 'o' | 'S' | 't') {
+                if offset + flag.len_utf8() == cluster.len() {
+                    arguments.next();
+                }
+                break;
+            }
+        }
+    }
+    false
 }
 
 fn is_contained_compile_check_arguments(arguments: &[String]) -> bool {

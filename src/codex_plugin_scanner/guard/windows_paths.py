@@ -54,13 +54,18 @@ class _WindowsByHandleFileInformation(ctypes.Structure):
     ]
 
 
-def open_windows_locked_regular_descriptor(path: Path | str) -> int:
+def open_windows_locked_regular_descriptor(
+    path: Path | str,
+    *,
+    expected_resolved_path: Path | str | None = None,
+) -> int:
     """Open one regular file while denying concurrent write/delete access.
 
     The returned CRT descriptor owns the native handle.  ``FILE_SHARE_READ``
     deliberately excludes write and delete sharing, so the pathname cannot be
     replaced and an existing writer cannot coexist while trusted bytes are
-    hashed.
+    hashed. An expected canonical path additionally binds the native handle to
+    that physical path, including when an ancestor junction changes at open.
     """
 
     if os.name != "nt":
@@ -117,6 +122,19 @@ def open_windows_locked_regular_descriptor(path: Path | str) -> int:
         attributes = int(information.dwFileAttributes)
         if attributes & (_WINDOWS_FILE_ATTRIBUTE_DIRECTORY | _FILE_ATTRIBUTE_REPARSE_POINT):
             raise OSError("windows_locked_file_not_regular")
+        if expected_resolved_path is not None:
+            get_final_path = kernel32.GetFinalPathNameByHandleW
+            get_final_path.argtypes = [wintypes.HANDLE, wintypes.LPWSTR, wintypes.DWORD, wintypes.DWORD]
+            get_final_path.restype = wintypes.DWORD
+            buffer = ctypes.create_unicode_buffer(_WINDOWS_PATH_BUFFER_SIZE)
+            length = int(get_final_path(handle, buffer, len(buffer), 0))
+            if length <= 0 or length >= len(buffer):
+                raise OSError("windows_locked_file_final_path_unavailable")
+            # FILE_NAME_NORMALIZED | VOLUME_NAME_DOS resolves junction targets.
+            # Never resolve the expected path here: its pre-open identity is
+            # the boundary against which this opened handle must be checked.
+            if _canonical_windows_path(buffer.value) != _canonical_windows_path(expected_resolved_path):
+                raise OSError("windows_locked_file_path_changed")
         handle_value = handle if isinstance(handle, int) else getattr(handle, "value", None)
         if not isinstance(handle_value, int):
             raise OSError("windows_locked_file_handle_invalid")
@@ -134,6 +152,19 @@ def open_windows_locked_regular_descriptor(path: Path | str) -> int:
         if handle is not None and close_handle is not None:
             with suppress(OSError, RuntimeError, TypeError, ValueError):
                 _ = close_handle(handle)
+
+
+def _canonical_windows_path(path: Path | str) -> str:
+    value = ntpath.normpath(os.fspath(path))
+    if value[:8].upper() == "\\\\?\\UNC\\":
+        value = "\\\\" + value[8:]
+    elif value.startswith("\\\\?\\"):
+        value = value[4:]
+    if not ntpath.isabs(value) or not ntpath.splitdrive(value)[0]:
+        raise OSError("windows_locked_file_expected_path_not_absolute")
+    # Case-sensitive Windows directories can contain distinct names which
+    # normcase would conflate. Both operands must already be canonical paths.
+    return value
 
 
 def windows_command_line_to_argv(command: str) -> list[str] | None:
