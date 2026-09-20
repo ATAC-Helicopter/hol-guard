@@ -113,7 +113,21 @@ UIVOID_WRAPPER_REVIEW_COMMANDS: tuple[tuple[str, str], ...] = (
     ("npm exec --yes uivoid create my-app", "command.uivoid.create"),
     ("pnpm exec --silent uivoid create my-app", "command.uivoid.create"),
     ("pnpm dlx --silent uivoid create my-app", "command.uivoid.create"),
+    ("npx -- uivoid create my-app", "command.uivoid.create"),
+    ("npm exec -- uivoid create my-app", "command.uivoid.create"),
 )
+
+# Known gap, not fixed in this extension: a version or dist-tag on the
+# package spec itself (npx uivoid@latest create, npm exec uivoid@1.2.3
+# create) evades every wrapper rule above, since ExecutableMatcher's
+# subcommands do exact-token comparison. Fixing this needs either a new
+# native-command-program-reviewed matcher primitive (native_command_program.py
+# keeps an explicit allowlist of matcher types by design -- introducing an
+# unreviewed one here breaks `scripts/build_native_command_program.py`
+# outright, verified locally) or an existing reviewed primitive that fits
+# this token shape, which none of ExecutableMatcher/ArgumentMatcher/
+# SubcommandOperandPrefixMatcher do. Left for maintainers rather than adding
+# an unreviewed matcher type to close it.
 
 
 def test_uivoid_wrapper_invocations_reach_review(tmp_path: Path) -> None:
@@ -146,6 +160,7 @@ UIVOID_SAFE_COMMANDS: tuple[str, ...] = (
     "uivoid oauth-config --help",
     "uivoid login --help",
     "uivoid skill --install --help",  # --help short-circuits before the install runs
+    "npx uivoid create --help",
 )
 
 
