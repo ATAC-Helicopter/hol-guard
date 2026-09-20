@@ -35,7 +35,17 @@ UIVOID_REVIEW_CASES: tuple[tuple[str, str, str], ...] = (
         "command.uivoid.create",
     ),
     (
+        "uivoid create my-app --exclude-destructive",
+        "uivoid live project creation command",
+        "command.uivoid.create",
+    ),
+    (
         "uivoid credentials my-app --auth-key sk_test_123",
+        "uivoid outbound credential rotation command",
+        "command.uivoid.credentials",
+    ),
+    (
+        "uivoid credentials my-app --auth-key=sk_test_123",
         "uivoid outbound credential rotation command",
         "command.uivoid.credentials",
     ),
@@ -95,6 +105,14 @@ UIVOID_WRAPPER_REVIEW_COMMANDS: tuple[tuple[str, str], ...] = (
     ("npx uivoid credentials my-app --auth-key sk_test_123", "command.uivoid.credentials"),
     ("npx uivoid skill --install", "command.uivoid.skill-install"),
     ("npx uivoid login --token pat_abc123", "command.uivoid.login"),
+    # Launcher-level options before the package name must not shift the
+    # subcommand prefix and skip review.
+    ("npx --yes uivoid create my-app", "command.uivoid.create"),
+    ("npx -y uivoid create my-app", "command.uivoid.create"),
+    ("pnpm --silent uivoid create my-app", "command.uivoid.create"),
+    ("npm exec --yes uivoid create my-app", "command.uivoid.create"),
+    ("pnpm exec --silent uivoid create my-app", "command.uivoid.create"),
+    ("pnpm dlx --silent uivoid create my-app", "command.uivoid.create"),
 )
 
 
@@ -140,3 +158,25 @@ def test_uivoid_extension_publishes_official_reference() -> None:
     assert extension is not None
     assert extension.reference_urls
     assert all(url.startswith("https://") for url in extension.reference_urls)
+
+
+UIVOID_SECRET_BEARING_COMMANDS: tuple[str, ...] = (
+    "uivoid credentials my-app --auth-key sk_live_super_secret_value",
+    'uivoid credentials my-app --auth-header "x-api-key:sk_live_super_secret_value"',
+    "uivoid login --token pat_super_secret_value",
+    "uivoid oauth-config my-app --client-secret oauth_super_secret_value",
+)
+
+
+def test_uivoid_evidence_never_contains_secret_values(tmp_path: Path) -> None:
+    """Evidence must stay a static description, never the matched command's own values."""
+
+    for command in UIVOID_SECRET_BEARING_COMMANDS:
+        matches = BUILT_IN_COMMAND_EXTENSION_REGISTRY.matching_rules(
+            parse_shell_command(command, cwd=tmp_path, home_dir=tmp_path)
+        )
+        uivoid_matches = [match for match in matches if match[0].extension_id == "command.uivoid"]
+        assert uivoid_matches, command
+        for _extension, _rule, evidence in uivoid_matches:
+            for item in evidence:
+                assert "secret_value" not in item.detail, (command, item.detail)

@@ -16,7 +16,17 @@ from .command_rules import AnyMatcher, CommandSafetyRule, CommandSafeVariant, Ex
 #
 # Conservative matching covers the direct binary plus common npm launcher
 # wrappers: npx/bunx uivoid, pnpm/yarn uivoid, npm/pnpm exec uivoid, and
-# pnpm/yarn dlx uivoid.
+# pnpm/yarn dlx uivoid. Launcher-level options the package manager itself
+# accepts before the package name (npx -y, pnpm --silent, npm exec --yes,
+# a workspace filter, ...) are declared as interspersed so a flag placed
+# before `uivoid` cannot shift the subcommand prefix and skip review --
+# the same option/flag sets already reviewed for the supabase extension.
+_RUNNER_OPTIONS_WITH_VALUES: frozenset[str] = frozenset(
+    {"--cache", "--call", "--dir", "--filter", "--package", "--reporter", "--workspace", "-C", "-F", "-c", "-p", "-w"}
+)
+_RUNNER_FLAGS: frozenset[str] = frozenset(
+    {"--aggregate-output", "--silent", "--stream", "--use-stderr", "--workspace-root", "--yes", "-y"}
+)
 
 
 def _uivoid_matchers(
@@ -29,21 +39,29 @@ def _uivoid_matchers(
             executables=executable_names("npx") | executable_names("bunx"),
             subcommands=("uivoid", *subcommands),
             required_flags=required_flags,
+            interspersed_options_with_values=_RUNNER_OPTIONS_WITH_VALUES,
+            interspersed_flags=_RUNNER_FLAGS,
         ),
         ExecutableMatcher(
             executables=executable_names("pnpm") | executable_names("yarn"),
             subcommands=("uivoid", *subcommands),
             required_flags=required_flags,
+            interspersed_options_with_values=_RUNNER_OPTIONS_WITH_VALUES,
+            interspersed_flags=_RUNNER_FLAGS,
         ),
         ExecutableMatcher(
             executables=executable_names("npm") | executable_names("pnpm"),
             subcommands=("exec", "uivoid", *subcommands),
             required_flags=required_flags,
+            interspersed_options_with_values=_RUNNER_OPTIONS_WITH_VALUES,
+            interspersed_flags=_RUNNER_FLAGS,
         ),
         ExecutableMatcher(
             executables=executable_names("pnpm") | executable_names("yarn"),
             subcommands=("dlx", "uivoid", *subcommands),
             required_flags=required_flags,
+            interspersed_options_with_values=_RUNNER_OPTIONS_WITH_VALUES,
+            interspersed_flags=_RUNNER_FLAGS,
         ),
     )
 
