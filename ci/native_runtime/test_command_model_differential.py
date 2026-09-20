@@ -36,7 +36,7 @@ UNCERTAIN_FIXTURES = (
     "cat <<EOF",
     "echo hello > out.txt",
     "sleep 1 &",
-    "sudo rm -rf /tmp/example",
+    "sudo -s rm -rf /tmp/example",
     "env FOO=bar tool",
     "time tool",
     "stdbuf -o0 tool",

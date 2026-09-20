@@ -87,7 +87,7 @@ def main() -> int:
     for index, command in enumerate(review_only):
         result = decision(runtime, command, f"review-{index}")
         assert result["decision"] == "deny"
-        assert result["policy_action"] in {"review", "block"}
+        assert result["policy_action"] in {"review", "require-reapproval", "block"}
 
     uncertain = (
         "echo $(whoami)",

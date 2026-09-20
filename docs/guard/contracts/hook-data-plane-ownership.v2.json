@@ -305,7 +305,8 @@
         "src/codex_plugin_scanner/guard/runtime/hook_review_engine.py",
         "src/codex_plugin_scanner/guard/runtime/hook_source_read.py",
         "src/codex_plugin_scanner/guard/runtime/source_paths.py",
-        "src/codex_plugin_scanner/guard/native_command_model.py"
+        "src/codex_plugin_scanner/guard/native_command_model.py",
+        "src/codex_plugin_scanner/guard/native_command_model_wrappers.py"
       ],
       "current": "differential-test oracle only; production off is fail-safe and shadow is diagnostic-only",
       "target": "differential tests only"
