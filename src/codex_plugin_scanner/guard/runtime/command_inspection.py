@@ -33,7 +33,10 @@ def unavailable_command_inspection(
     command_text = command.strip()
     if not command_text:
         raise ValueError("Command text cannot be empty")
-    preview = canonical_command or parse_shell_command(command_text, cwd=cwd, home_dir=home_dir)
+    if canonical_command is None:
+        preview = parse_shell_command(command_text, cwd=cwd, home_dir=home_dir)
+    else:
+        preview = canonical_command
     return {
         "schema_version": COMMAND_EXTENSION_SCHEMA_VERSION,
         "status": "native_unavailable",

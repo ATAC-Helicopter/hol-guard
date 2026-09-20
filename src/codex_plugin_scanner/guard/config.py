@@ -490,7 +490,7 @@ def _read_toml(path: Path) -> dict[str, object]:
     if contents is None:
         return {}
     payload = tomllib.loads(contents.decode("utf-8"))
-    return payload if isinstance(payload, dict) else {}
+    return payload
 
 
 def _coerce_loaded_receipt_redaction_level(value: object) -> str:

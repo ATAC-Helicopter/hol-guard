@@ -582,58 +582,60 @@ def _native_classification_factors(
         and value.get("minimum_action") == "allow"
         and value.get("explicitly_benign") is True
     )
-    if not blocked and not privileged_wrapper_reapproval and not explicitly_benign:
-        return ()
-    digest = hashlib.sha256(
-        json.dumps(
-            {
-                "schema": "guard.native-classification-projection.v1",
-                "command_security_identity": command.security_identity,
-                "command_extensions": value["command_extensions"],
-                "minimum_action": (
-                    "block" if blocked else "require-reapproval" if privileged_wrapper_reapproval else "allow"
-                ),
-                "explicitly_benign": explicitly_benign,
-            },
-            sort_keys=True,
-            separators=(",", ":"),
-        ).encode()
-    ).hexdigest()
-    if blocked:
-        return (
-            DecisionFactor(
-                source=DecisionFactorSource.ASSURANCE,
-                reason_code="native.classification-block",
-                basis=DecisionBasis("block", None),
-                producer_ref="native:command-classification",
-                evidence_digest=digest,
-            ),
-        )
-    if privileged_wrapper_reapproval:
-        return (
-            DecisionFactor(
-                source=DecisionFactorSource.ASSURANCE,
-                reason_code="native.privileged-wrapper-reapproval",
-                basis=DecisionBasis("require-reapproval", None),
-                producer_ref="native:command-classification",
-                evidence_digest=digest,
-            ),
-        )
-    proof = PositiveProof(
-        ProofRoute.VERIFIED,
-        digest,
-        frozenset({ProofRequirement.CONFIGURATION_IDENTITY, ProofRequirement.PARSER_CONFIDENCE}),
-    )
-    return (
-        DecisionFactor(
-            source=DecisionFactorSource.ASSURANCE,
-            reason_code="native.explicit-benign",
-            basis=DecisionBasis("allow", ProofRoute.VERIFIED),
-            producer_ref="native:command-classification",
-            evidence_digest=digest,
-            proof=proof,
-        ),
-    )
+    factors: list[DecisionFactor] = []
+    if blocked or privileged_wrapper_reapproval or explicitly_benign:
+        digest = hashlib.sha256(
+            json.dumps(
+                {
+                    "schema": "guard.native-classification-projection.v1",
+                    "command_security_identity": command.security_identity,
+                    "command_extensions": value["command_extensions"],
+                    "minimum_action": (
+                        "block" if blocked else "require-reapproval" if privileged_wrapper_reapproval else "allow"
+                    ),
+                    "explicitly_benign": explicitly_benign,
+                },
+                sort_keys=True,
+                separators=(",", ":"),
+            ).encode()
+        ).hexdigest()
+        if blocked:
+            factors.append(
+                DecisionFactor(
+                    source=DecisionFactorSource.ASSURANCE,
+                    reason_code="native.classification-block",
+                    basis=DecisionBasis("block", None),
+                    producer_ref="native:command-classification",
+                    evidence_digest=digest,
+                )
+            )
+        elif privileged_wrapper_reapproval:
+            factors.append(
+                DecisionFactor(
+                    source=DecisionFactorSource.ASSURANCE,
+                    reason_code="native.privileged-wrapper-reapproval",
+                    basis=DecisionBasis("require-reapproval", None),
+                    producer_ref="native:command-classification",
+                    evidence_digest=digest,
+                )
+            )
+        else:
+            proof = PositiveProof(
+                ProofRoute.VERIFIED,
+                digest,
+                frozenset({ProofRequirement.CONFIGURATION_IDENTITY, ProofRequirement.PARSER_CONFIDENCE}),
+            )
+            factors.append(
+                DecisionFactor(
+                    source=DecisionFactorSource.ASSURANCE,
+                    reason_code="native.explicit-benign",
+                    basis=DecisionBasis("allow", ProofRoute.VERIFIED),
+                    producer_ref="native:command-classification",
+                    evidence_digest=digest,
+                    proof=proof,
+                )
+            )
+    return tuple(factors)
 
 
 def _explicit_permission_allow_factors(
