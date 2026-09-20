@@ -16,7 +16,6 @@ import platform
 import secrets
 import socket
 import sqlite3
-import stat
 import tempfile
 import threading
 import time
@@ -111,6 +110,12 @@ from ..desktop_notifications import (
     desktop_notification_setup_payload,
     ensure_desktop_notification_setup,
     macos_notification_guidance,
+)
+from ..directory_path_authority import (
+    DirectoryPathTrustError,
+    trusted_guard_directory_roots,
+    validate_guard_directory_path,
+    validated_owned_temporary_workspace,
 )
 from ..harness_disconnect_gate import require_harness_disconnect_gate
 from ..insights_share import publish_insights_share
@@ -5917,7 +5922,11 @@ class _GuardDaemonHandler(BaseHTTPRequestHandler):
         workspace_path, home_path = self._validated_fail_safe_hook_paths(params)
         guard_home = None if daemon_server is None else cast(_GuardDaemonHttpServer, daemon_server).store.guard_home
         try:
-            loaded = None if guard_home is None else load_guard_config(guard_home, workspace=workspace_path)
+            loaded = (
+                None
+                if guard_home is None
+                else load_guard_config(guard_home, workspace=workspace_path, require_canonical_workspace=True)
+            )
             observe_mode = loaded is not None and protection_is_off(posture=loaded.protection_posture, mode=loaded.mode)
         except (OSError, RuntimeError, TypeError, ValueError):
             observe_mode = False
@@ -7583,59 +7592,22 @@ class _GuardDaemonHandler(BaseHTTPRequestHandler):
         *,
         roots: tuple[Path, ...] | None = None,
     ) -> Path:
-        expanded = os.path.expanduser(value)
-        if not os.path.isabs(expanded):
-            raise _HookPathValidationError(parameter, "relative_path")
         try:
-            candidate = os.path.realpath(expanded)
-        except OSError:
-            raise _HookPathValidationError(parameter, "path_resolve_failed") from None
-        effective_roots = roots
-        if parameter in {"home", "workspace"} and effective_roots is None:
-            effective_roots = self._hook_safe_roots()
-        if effective_roots is not None:
-            root_match = False
-            for root in effective_roots:
-                root_path = os.path.realpath(os.fspath(root))
-                try:
-                    if os.path.commonpath([candidate, root_path]) == root_path:
-                        root_match = True
-                        break
-                except ValueError:
-                    continue
-            if not root_match and parameter == "workspace":
-                root_match = self._is_owned_temporary_hook_workspace(candidate)
-            if not root_match:
-                raise _HookPathValidationError(parameter, "unexpected_root")
-        return Path(candidate)
+            return validate_guard_directory_path(
+                value,
+                self._hook_safe_roots() if roots is None else roots,
+                allow_owned_temporary=parameter == "workspace",
+            )
+        except DirectoryPathTrustError as error:
+            raise _HookPathValidationError(parameter, error.reason) from error
 
     @staticmethod
     def _is_owned_temporary_hook_workspace(candidate: str) -> bool:
-        candidate_path = Path(candidate)
-        try:
-            temporary_root = trusted_temporary_root_for_path(candidate_path)
-        except OSError:
-            return False
-        if temporary_root is None:
-            return False
-        try:
-            # codeql[py/path-injection] candidate is canonical and contained by a trusted temp root.
-            candidate_stat = candidate_path.stat()
-        except OSError:
-            return False
-        if not stat.S_ISDIR(candidate_stat.st_mode):
-            return False
-        getuid = getattr(os, "getuid", None)
-        if not callable(getuid):
-            current_home = Path.home().resolve()
-            return _GuardDaemonHandler._path_is_within_root(
-                temporary_root,
-                current_home,
-            ) and _GuardDaemonHandler._path_is_within_root(
-                candidate_path,
-                temporary_root,
-            )
-        return candidate_stat.st_uid == getuid()
+        return _GuardDaemonHandler._validated_owned_temporary_hook_workspace(candidate) is not None
+
+    @staticmethod
+    def _validated_owned_temporary_hook_workspace(candidate: str) -> Path | None:
+        return validated_owned_temporary_workspace(candidate)
 
     def _validated_hook_guard_home(self, value: str | None) -> str | None:
         if value is None:
@@ -7653,12 +7625,7 @@ class _GuardDaemonHandler(BaseHTTPRequestHandler):
         return expected
 
     def _hook_safe_roots(self) -> tuple[Path, ...]:
-        current_home = Path.home().resolve()
-        roots: list[Path] = [current_home]
-        guard_home_root = self._daemon_server().store.guard_home.expanduser().resolve().parent
-        if not self._path_is_within_root(guard_home_root, current_home):
-            roots.append(guard_home_root)
-        return tuple(roots)
+        return trusted_guard_directory_roots(self._daemon_server().store.guard_home)
 
     @staticmethod
     def _path_is_within_root(candidate: Path | str, root: Path | str) -> bool:

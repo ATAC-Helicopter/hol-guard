@@ -4,27 +4,38 @@ from __future__ import annotations
 
 import os
 import stat
+from contextlib import ExitStack
 from pathlib import Path
 
-from .windows_paths import open_windows_locked_regular_descriptor
+from .windows_paths import hold_windows_locked_directory, open_windows_locked_regular_descriptor
 
 
 class ConfigFileTrustError(ValueError):
     """An existing configuration file could not be read with stable containment."""
 
 
-def read_config_file_bytes(directory: Path, filename: str) -> bytes | None:
+def read_config_file_bytes(
+    directory: Path,
+    filename: str,
+    *,
+    require_canonical_directory: bool = False,
+) -> bytes | None:
     """Read one unchanged regular config file from the selected directory.
 
     Directory aliases remain supported, including platform temporary-directory
-    aliases. The fixed child name is never resolved through a symbolic link.
+    aliases. An already-authorized canonical directory must retain that exact
+    path, rather than acquiring new authority through an alias replacement.
     """
 
     if filename not in ("config.toml", ".ai-plugin-scanner-guard.toml", ".hol-guard.toml"):
         raise ConfigFileTrustError("config_filename_not_allowed")
     try:
-        # codeql[py/path-injection] The caller selects a config root; children are allowlisted and containment-checked.
-        canonical_directory = directory.resolve(strict=True)
+        if require_canonical_directory:
+            if not directory.is_absolute() or ".." in directory.parts:
+                raise ConfigFileTrustError("config_directory_not_canonical")
+            canonical_directory = directory
+        else:
+            canonical_directory = directory.resolve(strict=True)
     except FileNotFoundError:
         return None
     except (OSError, RuntimeError, ValueError) as error:
@@ -63,7 +74,6 @@ def _open_directory(directory: Path) -> int:
     if os.open not in os.supports_dir_fd or not hasattr(os, "O_NOFOLLOW") or not hasattr(os, "O_DIRECTORY"):
         raise OSError("config_directory_open_unsupported")
     flags = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW | getattr(os, "O_CLOEXEC", 0)
-    # codeql[py/path-injection] The root is opened component-by-component with O_NOFOLLOW before fixed child access.
     descriptor = os.open(directory.anchor, flags)
     try:
         for component in directory.parts[1:]:
@@ -92,12 +102,16 @@ def _read_stable_bytes(descriptor: int, opened: os.stat_result) -> bytes:
 
 
 def _read_posix_config_bytes(directory: Path, canonical_directory: Path, filename: str) -> bytes | None:
-    # codeql[py/path-injection] This verifies the chosen root before a descriptor-pinned, allowlisted child read.
-    parent_before = canonical_directory.lstat()
-    if not stat.S_ISDIR(parent_before.st_mode):
-        raise ConfigFileTrustError("config_parent_not_directory")
-    parent_descriptor = _open_directory(canonical_directory)
     try:
+        parent_descriptor = _open_directory(canonical_directory)
+    except FileNotFoundError:
+        # Every preceding component was opened without following links. A
+        # missing component here is an absent workspace, not an alias escape.
+        return None
+    try:
+        parent_before = canonical_directory.lstat()
+        if not stat.S_ISDIR(parent_before.st_mode):
+            raise ConfigFileTrustError("config_parent_not_directory")
         parent_opened = os.fstat(parent_descriptor)
         if _directory_key(parent_before) != _directory_key(parent_opened):
             raise ConfigFileTrustError("config_directory_changed")
@@ -119,10 +133,8 @@ def _read_posix_config_bytes(directory: Path, canonical_directory: Path, filenam
             after = os.stat(filename, dir_fd=parent_descriptor, follow_symlinks=False)
             if _file_key(after) != _file_key(opened):
                 raise ConfigFileTrustError("config_file_changed_during_read")
-            # codeql[py/path-injection] This rechecks the descriptor-pinned root after the fixed child read.
             if _directory_key(canonical_directory.lstat()) != _directory_key(parent_opened):
                 raise ConfigFileTrustError("config_directory_changed")
-            # codeql[py/path-injection] This detects alias changes after containment is established.
             if directory.resolve(strict=True) != canonical_directory:
                 raise ConfigFileTrustError("config_directory_alias_changed")
             return payload
@@ -133,17 +145,38 @@ def _read_posix_config_bytes(directory: Path, canonical_directory: Path, filenam
 
 
 def _read_windows_config_bytes(directory: Path, canonical_directory: Path, filename: str) -> bytes | None:
+    # Hold each canonical ancestor against replacement, including while a
+    # missing workspace component or optional child file is inspected. Path
+    # checks alone cannot distinguish an ancestor swap-and-restore from absence.
+    with ExitStack() as held_directories:
+        component_path = Path(canonical_directory.anchor)
+        for component in (None, *canonical_directory.parts[1:]):
+            if component is not None:
+                component_path /= component
+            try:
+                held_directories.enter_context(
+                    hold_windows_locked_directory(component_path, expected_resolved_path=component_path)
+                )
+            except FileNotFoundError:
+                return None
+            except OSError as error:
+                raise ConfigFileTrustError("config_directory_unavailable_or_changed") from error
+        return _read_locked_windows_config_bytes(directory, canonical_directory, filename)
+
+
+def _read_locked_windows_config_bytes(directory: Path, canonical_directory: Path, filename: str) -> bytes | None:
     candidate = os.path.abspath(os.path.join(canonical_directory, filename))
     parent_prefix = os.fspath(canonical_directory).rstrip(os.sep) + os.sep
     if not candidate.startswith(parent_prefix):
         raise ConfigFileTrustError("config_file_outside_directory")
-    # codeql[py/path-injection] This verifies the chosen root; candidate uses only the allowlisted filename.
     parent_before = canonical_directory.lstat()
+    if not stat.S_ISDIR(parent_before.st_mode) or getattr(parent_before, "st_file_attributes", 0) & 0x400:
+        raise ConfigFileTrustError("config_parent_not_directory")
     try:
         before = os.lstat(candidate)
     except FileNotFoundError:
         return None
-    if not stat.S_ISDIR(parent_before.st_mode) or not _regular_file(before):
+    if not _regular_file(before):
         raise ConfigFileTrustError("config_file_not_single_regular_file")
     expected_resolved_path = os.path.realpath(candidate)
     if not expected_resolved_path.startswith(parent_prefix):
@@ -159,10 +192,8 @@ def _read_windows_config_bytes(directory: Path, canonical_directory: Path, filen
         payload = _read_stable_bytes(descriptor, opened)
         if _file_key(os.lstat(candidate)) != _file_key(before):
             raise ConfigFileTrustError("config_file_changed_during_read")
-        # codeql[py/path-injection] This rechecks the fixed root while the Windows descriptor denies replacement.
         if _directory_key(canonical_directory.lstat()) != _directory_key(parent_before):
             raise ConfigFileTrustError("config_directory_changed")
-        # codeql[py/path-injection] This only detects a selected-directory alias change after the locked child read.
         if directory.resolve(strict=True) != canonical_directory:
             raise ConfigFileTrustError("config_directory_alias_changed")
         return payload
