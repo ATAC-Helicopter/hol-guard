@@ -33,14 +33,18 @@ def test_release_please_job_is_pinned_and_least_privilege() -> None:
     dispatch = jobs["dispatch-stable-publish"]
 
     assert release["permissions"] == {"contents": "write", "pull-requests": "write"}
-    assert release["if"] == "github.run_attempt == 1"
+    assert "if" not in release
     assert release["outputs"]["release_created"] == "${{ steps.release.outputs.release_created }}"
     assert release["outputs"]["tag_name"] == "${{ steps.release.outputs.tag_name }}"
     assert release["outputs"]["sha"] == "${{ steps.release.outputs.sha }}"
     assert release["outputs"]["version"] == "${{ steps.release.outputs.version }}"
-    step = release["steps"][0]
+    require_token = release["steps"][0]
+    assert "RELEASE_PLEASE_TOKEN is not configured" in require_token["run"]
+    assert require_token["env"]["RELEASE_PLEASE_TOKEN"] == "${{ secrets.RELEASE_PLEASE_TOKEN }}"
+    step = release["steps"][1]
     assert step["id"] == "release"
     assert step["uses"] == PINNED_RELEASE_PLEASE_ACTION
+    assert step["with"]["token"] == "${{ secrets.RELEASE_PLEASE_TOKEN }}"
     assert step["with"]["target-branch"] == "main"
     assert step["with"]["config-file"] == "release-please-config.json"
     assert step["with"]["manifest-file"] == ".release-please-manifest.json"
@@ -48,8 +52,8 @@ def test_release_please_job_is_pinned_and_least_privilege() -> None:
 
     assert dispatch["needs"] == "release-please"
     assert dispatch["permissions"] == {"actions": "write", "contents": "read"}
-    assert "needs.release-please.outputs.release_created == 'true'" in dispatch["if"]
-    assert "github.run_attempt == 1" in dispatch["if"]
+    assert dispatch["if"] == "needs.release-please.outputs.release_created == 'true'"
+    assert "github.run_attempt == 1" not in str(dispatch.get("if", ""))
     run = dispatch["steps"][0]["run"]
     assert 'gh workflow run "Publish to PyPI"' in run
     assert '--ref "$TAG_NAME"' in run
