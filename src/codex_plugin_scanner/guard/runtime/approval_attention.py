@@ -164,7 +164,12 @@ class ApprovalAttentionCoordinator:
         ]
         if not requests or self._operation_was_superseded(operation):
             return
-        config = self._config_for_requests(requests)
+        try:
+            config = self._config_for_requests(requests)
+        except ValueError:
+            # An untrusted or swapped workspace fails closed for this operation
+            # without terminating the attention loop.
+            return
         if config.approval_surface_policy != "attention-aware" or self._runtime.has_live_surface("approval-center"):
             return
         open_key = f"approval-request:{item.request_ids[0]}"
