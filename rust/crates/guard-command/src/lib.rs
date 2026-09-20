@@ -105,9 +105,13 @@ pub fn parse_command(request: &CommandModelRequestV1) -> Result<CanonicalCommand
         return Ok(uncertain(request, raw, "command_byte_limit_exceeded"));
     }
 
-    let raw_segments = match split_execution_segments(raw) {
-        Ok(value) => value,
-        Err(reason) => return Ok(uncertain(request, raw, reason)),
+    let raw_segments = if let Some(value) = contained_compile_check_segments(raw) {
+        value
+    } else {
+        match split_execution_segments(raw) {
+            Ok(value) => value,
+            Err(reason) => return Ok(uncertain(request, raw, reason)),
+        }
     };
     if raw_segments.len() > MAX_COMMAND_SEGMENTS {
         return Ok(uncertain(request, raw, "command_segment_limit_exceeded"));
@@ -266,9 +270,14 @@ fn split_execution_segments(command: &str) -> Result<Vec<RawSegment>, &'static s
             {
                 return Err("non_posix_quoting_not_yet_supported");
             }
+            '<' | '>' if is_stderr_to_stdout_redirect(&chars, index) => {}
             '<' | '>' => return Err("command_redirect_not_yet_supported"),
             '(' | ')' | '{' | '}' => return Err("compound_shell_not_yet_supported"),
             '&' => {
+                if is_stderr_to_stdout_redirect(&chars, index) {
+                    index += 1;
+                    continue;
+                }
                 if chars.get(index + 1) != Some(&'&') {
                     return Err("background_job_not_yet_supported");
                 }
@@ -337,6 +346,87 @@ fn split_execution_segments(command: &str) -> Result<Vec<RawSegment>, &'static s
         return Err("empty_command_segment");
     }
     Ok(segments)
+}
+
+fn contained_compile_check_segments(command: &str) -> Option<Vec<RawSegment>> {
+    let chars: Vec<char> = command.chars().collect();
+    let and_index = chars.windows(2).position(|window| window == ['&', '&'])?;
+    if chars[and_index + 2..]
+        .windows(2)
+        .any(|window| window == ['&', '&'])
+    {
+        return None;
+    }
+    let (cd_start, cd_end) = trimmed_bounds(&chars, 0, and_index)?;
+    let (find_start, find_end) = trimmed_bounds(&chars, and_index + 2, chars.len())?;
+    let cd: String = chars[cd_start..cd_end].iter().collect();
+    let find: String = chars[find_start..find_end].iter().collect();
+    let cd_tokens = shell_tokens(&cd).ok()?;
+    let find_tokens = shell_tokens(&find).ok()?;
+    if cd_tokens.len() != 2
+        || cd_tokens.first().map(String::as_str) != Some("cd")
+        || !is_plain_cd_target(&cd_tokens[1])
+        || find_tokens.first().map(String::as_str) != Some("find")
+        || !is_contained_compile_check_arguments(&find_tokens[1..])
+    {
+        return None;
+    }
+    Some(vec![
+        RawSegment {
+            group_index: 0,
+            pipeline_index: 0,
+            start: cd_start,
+            end: cd_end,
+        },
+        RawSegment {
+            group_index: 1,
+            pipeline_index: 0,
+            start: find_start,
+            end: find_end,
+        },
+    ])
+}
+
+fn trimmed_bounds(chars: &[char], start: usize, end: usize) -> Option<(usize, usize)> {
+    let mut left = start;
+    let mut right = end;
+    while left < right && chars[left].is_whitespace() {
+        left += 1;
+    }
+    while right > left && chars[right - 1].is_whitespace() {
+        right -= 1;
+    }
+    (left < right).then_some((left, right))
+}
+
+fn is_stderr_to_stdout_redirect(chars: &[char], index: usize) -> bool {
+    let start = match chars.get(index) {
+        Some('&') => index.checked_sub(2),
+        Some('>') => index.checked_sub(1),
+        _ => None,
+    };
+    let Some(start) = start else {
+        return false;
+    };
+    let Some(redirect) = chars.get(start..start.saturating_add(4)) else {
+        return false;
+    };
+    redirect == ['2', '>', '&', '1']
+        && (start == 0 || is_shell_token_whitespace(chars[start - 1]))
+        && chars.get(start + 4).is_none_or(|value| {
+            is_shell_token_whitespace(*value) || matches!(*value, '|' | '&' | ';')
+        })
+}
+
+fn is_plain_cd_target(value: &str) -> bool {
+    !value.is_empty()
+        && !value.starts_with('-')
+        && !value.chars().any(|value| {
+            matches!(
+                value,
+                '$' | '`' | '<' | '>' | '|' | ';' | '&' | '(' | ')' | '{' | '}' | '\0'
+            )
+        })
 }
 
 fn push_segment(
@@ -517,9 +607,29 @@ fn is_nested_command_executor(executable: &str, arguments: &[String]) -> bool {
         return true;
     }
     basename == "find"
+        && !is_contained_compile_check_arguments(arguments)
         && arguments
             .iter()
             .any(|argument| matches!(argument.as_str(), "-exec" | "-execdir" | "-ok" | "-okdir"))
+}
+
+fn is_contained_compile_check_arguments(arguments: &[String]) -> bool {
+    const EXPECTED: [&str; 9] = [
+        "src",
+        "-name",
+        "*.py",
+        "-exec",
+        "python",
+        "-m",
+        "py_compile",
+        "{}",
+        "+",
+    ];
+    arguments.len() == EXPECTED.len()
+        && arguments
+            .iter()
+            .zip(EXPECTED)
+            .all(|(actual, expected)| actual == expected)
 }
 
 #[cfg(test)]
@@ -586,6 +696,46 @@ mod tests {
         assert_eq!(parsed.segments[0].pipeline_index, 0);
         assert_eq!(parsed.segments[1].tokens, ["grep", "b"]);
         assert_eq!(parsed.segments[1].pipeline_index, 1);
+    }
+
+    #[test]
+    fn parses_frozen_contained_routine_forms_without_general_shell_expansion() {
+        let stderr_pipeline = parse_command(&request(
+            "cd workspace/service && bun run typecheck 2>&1 | head -40",
+        ))
+        .unwrap();
+        assert_eq!(
+            stderr_pipeline.confidence, "exact",
+            "{:?}",
+            stderr_pipeline.uncertainty_reason
+        );
+        assert_eq!(stderr_pipeline.segments.len(), 3);
+        assert_eq!(
+            stderr_pipeline.segments[1].arguments,
+            ["run", "typecheck", "2>&1"]
+        );
+        assert_eq!(stderr_pipeline.segments[2].tokens, ["head", "-40"]);
+
+        let compile_check = parse_command(&request(
+            "cd workspace/service && find src -name '*.py' -exec python -m py_compile {} +",
+        ))
+        .unwrap();
+        assert_eq!(compile_check.confidence, "exact");
+        assert_eq!(compile_check.segments.len(), 2);
+        assert_eq!(
+            compile_check.segments[1].arguments,
+            [
+                "src",
+                "-name",
+                "*.py",
+                "-exec",
+                "python",
+                "-m",
+                "py_compile",
+                "{}",
+                "+"
+            ]
+        );
     }
 
     #[test]

@@ -5,10 +5,12 @@ from __future__ import annotations
 from pathlib import Path
 
 from codex_plugin_scanner.guard.runtime.command_extensions import BUILT_IN_COMMAND_EXTENSION_REGISTRY
-from codex_plugin_scanner.guard.runtime.command_inspection import inspect_command
 from codex_plugin_scanner.guard.runtime.command_storage_extensions import STORAGE_COMMAND_RULES
-from codex_plugin_scanner.guard.runtime.secret_file_requests import extract_sensitive_tool_action_request
 from tests.command_extension_contracts import assert_reviewed_command_cases, assert_safe_command_cases
+from tests.native_command_test_support import (
+    extract_sensitive_tool_action_request_native_test as extract_sensitive_tool_action_request,
+)
+from tests.native_command_test_support import inspect_command_native_test as inspect_command
 
 STORAGE_REVIEW_CASES: tuple[tuple[str, str, str], ...] = (
     (

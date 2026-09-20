@@ -21,6 +21,12 @@ import codex_plugin_scanner
 from codex_plugin_scanner.guard.approval_gate import ApprovalGateInput, update_settings
 from codex_plugin_scanner.guard.config import update_guard_settings
 from codex_plugin_scanner.guard.daemon.server import GuardDaemonServer
+from codex_plugin_scanner.guard.extension_builder.native_source_compiler import (
+    compile_source,
+    find_packaged_source_compiler,
+    run_source_compiler,
+    validate_source,
+)
 from codex_plugin_scanner.guard.native_approval_errors import NATIVE_COMMAND_CONTROL_ERROR_CODES
 from codex_plugin_scanner.guard.native_command_control_authority import AUTHORITY_FILE_NAME
 from codex_plugin_scanner.guard.native_hook_edge import review_raw_hook_native
@@ -55,6 +61,168 @@ _ACTION_RANK = {
     "sandbox-required": 4,
     "block": 5,
 }
+
+
+def additive_source_request() -> dict[str, object]:
+    """Return one ordinary data-only extension, independent of checkout assets."""
+
+    extension_id = "command.installed-authoring-probe"
+    permission_id = f"{extension_id}.permission.destroy"
+    rule_id = f"{extension_id}.destroy"
+    source = {
+        "schema": "guard.command-extension-source.v1",
+        "extension": {
+            "extension_id": extension_id,
+            "version": "1.0.0",
+            "name": "Installed authoring probe",
+            "description": "Synthetic data-only extension for installed compiler qualification.",
+            "action_classes": ["installed probe destructive operation"],
+            "risk_classes": ["destructive_shell"],
+            "safer_alternatives": ["Inspect the synthetic plan with --dry-run."],
+            "reference_urls": ["https://example.invalid/installed-authoring-probe"],
+            "required": False,
+            "source": "built-in",
+            "aliases": [],
+            "dependencies": [],
+            "conflicts": [],
+            "ecosystem_ids": [],
+            "executables": ["installed-authoring-probe"],
+            "project_markers": [],
+            "permissions": [
+                {
+                    "permission_id": permission_id,
+                    "implementation_version": "1.0.0",
+                    "label": "Destroy synthetic resource",
+                    "description": "Reviews the synthetic destructive operation.",
+                    "risk_tier": "high",
+                    "baseline_floor": "review",
+                    "default_enabled": True,
+                    "configurable": True,
+                    "typed_capabilities": [],
+                    "action_classes": ["installed probe destructive operation"],
+                    "dependencies": [],
+                    "conflicts": [],
+                    "implied_permissions": [],
+                    "introduced_version": "1.0.0",
+                    "deprecated": False,
+                    "safer_guidance": ["Inspect the synthetic plan with --dry-run."],
+                    "example_command": "installed-authoring-probe destroy",
+                }
+            ],
+            "rules": [
+                {
+                    "rule_id": rule_id,
+                    "rule_version": "1.0.0",
+                    "permission_id": permission_id,
+                    "title": "Destroy synthetic resource",
+                    "description": "Matches only the synthetic executable and argument.",
+                    "severity": "high",
+                    "risk_classes": ["destructive_shell"],
+                    "action_classes": ["installed probe destructive operation"],
+                    "safer_alternatives": ["Inspect the synthetic plan with --dry-run."],
+                    "default_mode": "review",
+                    "matcher": {
+                        "op": "arguments.v1",
+                        "config": {
+                            "executables": ["installed-authoring-probe"],
+                            "required_arguments": ["destroy"],
+                        },
+                    },
+                    "safe_variants": [
+                        {
+                            "variant_id": "dry-run",
+                            "title": "Inspect the synthetic plan",
+                            "matcher": {
+                                "op": "arguments.v1",
+                                "config": {
+                                    "executables": ["installed-authoring-probe"],
+                                    "required_arguments": ["--dry-run"],
+                                },
+                            },
+                        }
+                    ],
+                }
+            ],
+        },
+    }
+    trust = {
+        "schemaVersion": "guard.extension-trust-class-map.v1",
+        "publishers": {
+            "hol": {"id": "hol", "displayName": "Hashgraph Online"},
+            "hol-curated": {"id": "hol-curated", "displayName": "HOL curated library"},
+        },
+        "classes": {"first-party": [extension_id], "trusted-library": [], "external": []},
+    }
+    return {
+        "schema": "guard.command-extension-build.v1",
+        "base": "packaged",
+        "sources": [source],
+        "mcp_sources": [],
+        "trust": trust,
+    }
+
+
+def prove_installed_data_only_authoring(package: Path) -> dict[str, object]:
+    """Validate, compile, and simulate an additive source with packaged binaries."""
+
+    native = package.parent / "_native"
+    find_packaged_source_compiler()
+    source_manifest = json.loads((native / "source-compiler-manifest.json").read_text(encoding="utf-8"))
+    runtime_manifest = json.loads((native / "runtime-manifest.json").read_text(encoding="utf-8"))
+    request = additive_source_request()
+    validated = validate_source(request)
+    compiled = compile_source(request)
+    program = compiled.get("program")
+    require(isinstance(program, dict), "authoring_program_missing")
+    fixtures = {
+        "schema": "guard.command-extension-fixtures.v1",
+        "build": request,
+        "cases": [
+            {
+                "id": "active",
+                "command": "installed-authoring-probe destroy",
+                "enabled_extensions": ["command.installed-authoring-probe"],
+                "disabled_permissions": [],
+                "expected_action": "review",
+                "rule_id": "command.installed-authoring-probe.destroy",
+                "expected_effective_segments": [0],
+            },
+            {
+                "id": "dry-run",
+                "command": "installed-authoring-probe destroy --dry-run",
+                "enabled_extensions": ["command.installed-authoring-probe"],
+                "disabled_permissions": [],
+                "expected_action": "review",
+                "rule_id": "command.installed-authoring-probe.destroy",
+                "expected_effective_segments": [],
+            },
+        ],
+    }
+    tested = run_source_compiler("test", fixtures)
+    base_program = BUILT_IN_COMMAND_EXTENSION_REGISTRY.program_digest
+    implementation = BUILT_IN_COMMAND_EXTENSION_REGISTRY.implementation_digest
+    require(source_manifest["source_sha"] == runtime_manifest["source_sha"], "authoring_source_identity")
+    require(source_manifest["base_program_digest"] == base_program, "authoring_catalog_program")
+    require(source_manifest["implementation_digest"] == implementation, "authoring_implementation")
+    require(validated.get("program_digest") == program.get("program_digest"), "authoring_validate_compile")
+    require(validated.get("source_digest") == compiled.get("source_digest"), "authoring_validate_source")
+    require(validated.get("implementation_digest") == implementation, "authoring_validate_implementation")
+    require(compiled.get("base_program_digest") == base_program, "authoring_compile_base")
+    require(compiled.get("implementation_digest") == implementation, "authoring_compile_implementation")
+    require(compiled.get("catalog_projection_kind") == "addition-only-not-release-catalog", "authoring_projection")
+    require(tested.get("ok") is True and tested.get("target_commands_executed") == 0, "authoring_fixtures")
+    require(tested.get("scope") == "offline-simulation-not-authenticated-receipts", "authoring_fixture_scope")
+    require(tested.get("program_digest") == program.get("program_digest"), "authoring_fixture_program")
+    return {
+        "scope": tested["scope"],
+        "target_commands_executed": tested["target_commands_executed"],
+        "fixture_cases": len(tested["cases"]),
+        "base_program_digest": base_program,
+        "compiled_program_digest": program["program_digest"],
+        "source_digest": compiled["source_digest"],
+        "implementation_digest": implementation,
+        "source_sha": source_manifest["source_sha"],
+    }
 
 
 def require(condition: bool, code: str) -> None:
@@ -467,6 +635,9 @@ def exercise(root: Path) -> dict[str, object]:
             "persisted_receipts": len(all_receipts),
             "marker_tamper_rejected": True,
             "interactive_enrollment_exercised": False,
+            "cross_version_upgrade_rollback_exercised": False,
+            "bad_generation_injection_exercised": False,
+            "stale_approval_replay_exercised": False,
             "target_commands_executed": 0,
         }
     finally:
@@ -486,8 +657,11 @@ def main() -> int:
         status.capabilities is not None and "native-command-program-v1" in status.capabilities.features,
         "native_feature_missing",
     )
+    authoring = prove_installed_data_only_authoring(package)
     with tempfile.TemporaryDirectory(prefix="hge-", dir=None if os.name == "nt" else "/tmp") as temporary:
         report = exercise(Path(temporary))
+    report["data_only_authoring"] = authoring
+    report["data_only_authoring_receipts_authenticated"] = False
     report["source_sha"] = status.capabilities.build_sha
     report["rule_digest"] = status.capabilities.rule_digest
     args.json.write_text(json.dumps(report, sort_keys=True, indent=2) + "\n", encoding="utf-8")

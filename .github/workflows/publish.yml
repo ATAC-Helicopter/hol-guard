@@ -131,8 +131,6 @@ jobs:
             --setup-action-ref "$SETUP_UV_ACTION_REF"
       - name: Install dependencies
         run: uv sync --frozen --extra dev --extra publish --extra cisco
-      - name: Verify native command program is current
-        run: uv run --no-sync python scripts/build_native_command_program.py --check
       - name: Compute publish version
         id: version
         env:
@@ -466,19 +464,23 @@ jobs:
             platform_tag: manylinux_2_17_x86_64
             target: x86_64-unknown-linux-musl
             runtime: rust/target/x86_64-unknown-linux-musl/release/hol-guard-runtime
+            source_compiler: rust/target/x86_64-unknown-linux-musl/release/guard-command-source
           - runner: macos-15-intel
             platform_tag: macosx_13_0_x86_64
             target: x86_64-apple-darwin
             runtime: rust/target/x86_64-apple-darwin/release/hol-guard-runtime
+            source_compiler: rust/target/x86_64-apple-darwin/release/guard-command-source
           - runner: macos-15
             platform_tag: macosx_11_0_arm64
             target: aarch64-apple-darwin
             runtime: rust/target/aarch64-apple-darwin/release/hol-guard-runtime
+            source_compiler: rust/target/aarch64-apple-darwin/release/guard-command-source
           - runner: windows-latest
             platform_tag: win_amd64
             rustflags: -C link-arg=/Brepro
             target: x86_64-pc-windows-msvc
             runtime: rust/target/x86_64-pc-windows-msvc/release/hol-guard-runtime.exe
+            source_compiler: rust/target/x86_64-pc-windows-msvc/release/guard-command-source.exe
     steps:
       - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405
         with:
@@ -531,9 +533,24 @@ jobs:
           RUSTFLAGS: ${{ matrix.rustflags }}
           RUST_TARGET: ${{ matrix.target }}
           RUNTIME: ${{ matrix.runtime }}
+          SOURCE_COMPILER: ${{ matrix.source_compiler }}
         run: |
           cargo build --manifest-path rust/Cargo.toml --locked --release --target "$RUST_TARGET" -p hol-guard-runtime
+          cargo build --manifest-path rust/Cargo.toml --locked --release --target "$RUST_TARGET" -p guard-command --bin guard-command-source
           "$RUNTIME" self-test --json
+      - name: Verify native command program is current
+        shell: bash
+        env:
+          SOURCE_COMPILER: ${{ matrix.source_compiler }}
+        run: python scripts/build_native_command_program.py --check --compiler "$SOURCE_COMPILER"
+      - name: Verify native source compiler output
+        shell: bash
+        env:
+          SOURCE_COMPILER: ${{ matrix.source_compiler }}
+        run: |
+          jq -n --slurpfile source rust/crates/guard-command/tests/fixtures/command-source-example.v1.json --slurpfile trust contracts/extensions/trust-class-map.v1.json \
+            '{schema:"guard.command-extension-build.v1",sources:$source,mcp_sources:[],trust:$trust[0],base:"packaged"}' > source-build.json
+          "$SOURCE_COMPILER" compile < source-build.json > source-compiled.json
       - name: Verify Linux runtime is static
         if: runner.os == 'Linux'
         shell: bash
@@ -551,6 +568,7 @@ jobs:
           PLATFORM_TAG: ${{ matrix.platform_tag }}
           RUNTIME: ${{ matrix.runtime }}
           SOURCE_SHA: ${{ needs.build.outputs.source_sha }}
+          SOURCE_COMPILER: ${{ matrix.source_compiler }}
           TARGET: ${{ matrix.target }}
           VERSION: ${{ needs.build.outputs.version }}
         run: |
@@ -563,7 +581,10 @@ jobs:
             --platform-tag "$PLATFORM_TAG" \
             --target "$TARGET" \
             --source-sha "$SOURCE_SHA" \
-            --rule-digest "$RULE_DIGEST"
+            --rule-digest "$RULE_DIGEST" \
+            --source-compiler "$SOURCE_COMPILER" \
+            --implementation-digest "$(python -c 'import json,sys; print(json.load(open("source-compiled.json"))["implementation_digest"])')" \
+            --base-program-digest "$(python -c 'import json,sys; print(json.load(open("source-compiled.json"))["base_program_digest"])')"
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: native-guard-wheel-${{ matrix.platform_tag }}

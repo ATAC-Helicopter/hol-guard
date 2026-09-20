@@ -159,7 +159,6 @@ from ..runtime.approval_attention import ApprovalAttentionCoordinator
 from ..runtime.cloud_review_sync import CloudReviewSyncWorker, start_cloud_sync_sync_worker, stop_cloud_sync_sync_worker
 from ..runtime.command_activity_contract import ActivityApprovalReuseStatus, ActivityDecisionReason
 from ..runtime.command_activity_lifecycle import CommandActivityDecisionFacts, build_pre_hook_evidence
-from ..runtime.command_evaluation import evaluate_command
 from ..runtime.command_extensions import BUILT_IN_COMMAND_EXTENSION_REGISTRY
 from ..runtime.command_shadow_evaluation import (
     CommandShadowCohort,
@@ -168,9 +167,14 @@ from ..runtime.command_shadow_evaluation import (
     build_command_shadow_observation,
 )
 from ..runtime.extension_control_authority import ExtensionControlAuthorityError, ExtensionControlAuthorityView
-from ..runtime.extension_control_runtime import ExtensionControlRuntime, ExtensionControlRuntimeSnapshot
+from ..runtime.extension_control_runtime import (
+    ExtensionControlRuntime,
+    ExtensionControlRuntimeSnapshot,
+    current_extension_control_snapshot,
+)
 from ..runtime.isolation_provider import load_managed_provider_registry
 from ..runtime.local_temp_paths import trusted_temporary_root_for_path
+from ..runtime.native_command_evaluation import evaluate_command_native
 from ..runtime.network_status import build_network_status, project_network_supervisor_health
 from ..runtime.network_supervisor import NetworkSupervisor
 from ..runtime.runner import (
@@ -318,6 +322,7 @@ _EXTENSION_CONTROL_PATHS = frozenset(
     {
         "/v1/extension-controls/preview",
         "/v1/extension-controls/test",
+        "/v1/extension-controls/inspect",
         "/v1/extension-controls/apply",
         "/v1/extension-controls/refresh",
         "/v1/extension-controls/recover-authority",
@@ -2070,7 +2075,36 @@ _PROTECTION_REPAIR_PROBE_COMMAND = "git status --porcelain=v1"
 
 
 def _repair_command_activity_persistence_health(store: GuardStore) -> None:
-    evaluation = evaluate_command(_PROTECTION_REPAIR_PROBE_COMMAND)
+    snapshot = current_extension_control_snapshot()
+    if snapshot is None:
+        try:
+            snapshot = ExtensionControlRuntimeSnapshot.from_authority_view(
+                store.read_extension_control_authority_for_registry(
+                    BUILT_IN_COMMAND_EXTENSION_REGISTRY,
+                    read_only=True,
+                )
+            )
+        except Exception:
+            snapshot = None
+    try:
+        evaluation = (
+            evaluate_command_native(
+                _PROTECTION_REPAIR_PROBE_COMMAND,
+                guard_home=store.guard_home,
+                extension_control_snapshot=snapshot,
+            )
+            if snapshot is not None
+            else None
+        )
+    except Exception:
+        evaluation = None
+    if evaluation is None:
+        with suppress(Exception):
+            store.record_command_activity_persistence_failure(
+                error_code="native_evaluation_unavailable",
+                occurred_at=datetime.now(timezone.utc),
+            )
+        return
     occurred_at = datetime.now(timezone.utc)
     activity_id = f"activity:protection-repair-probe:{uuid.uuid4().hex}"
     decision_reason = ActivityDecisionReason.EXTENSION_MATCH if evaluation.matches else ActivityDecisionReason.NO_MATCH
@@ -2717,6 +2751,8 @@ class _GuardDaemonHandler(BaseHTTPRequestHandler):
             try:
                 if parsed.path.endswith("/test"):
                     response = self._daemon_server().extension_control_api.test_command(payload)
+                elif parsed.path.endswith("/inspect"):
+                    response = self._daemon_server().extension_control_api.inspect_command(payload)
                 elif parsed.path.endswith("/preview"):
                     response = self._daemon_server().extension_control_api.preview(payload)
                 elif parsed.path.endswith("/apply"):

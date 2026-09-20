@@ -18,7 +18,7 @@ from codex_plugin_scanner.guard.cli.commands_support_runtime_artifacts import (
     _codex_post_tool_output_artifact,
 )
 from codex_plugin_scanner.guard.runtime import git_pathspecs as git_pathspecs_module
-from codex_plugin_scanner.guard.runtime.command_inspection import inspect_command
+from tests.native_command_test_support import inspect_command_native_test as inspect_command
 
 
 def _write(path: Path, text: str) -> None:

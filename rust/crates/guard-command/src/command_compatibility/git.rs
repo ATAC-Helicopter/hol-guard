@@ -63,7 +63,10 @@ pub(super) fn observe(
     result: &mut CompatibilityObservations,
 ) {
     let arguments = &segment.arguments;
-    if arguments.len() == 1 && matches!(arguments[0].as_str(), "--help" | "--version" | "-h") {
+    if arguments
+        .first()
+        .is_some_and(|argument| matches!(argument.as_str(), "--help" | "--version" | "-h"))
+    {
         return;
     }
     let Some(command_index) = command_index(arguments) else {

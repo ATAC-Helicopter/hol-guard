@@ -9,8 +9,8 @@ from typing import cast
 
 import pytest
 
-from codex_plugin_scanner.guard.runtime.command_inspection import inspect_command
 from codex_plugin_scanner.guard.runtime.read_only_git_audit import is_read_only_git_ancestry_audit
+from tests.native_command_test_support import inspect_command_native_test as inspect_command
 
 _GIT_ROUTING_ENV = (
     "GIT_CONFIG",

@@ -235,9 +235,32 @@ fn exact_safe_command(model: &CanonicalCommandV1, allow_git_helper_context: bool
     })
 }
 
+fn exact_destructive_tool_introspection(model: &CanonicalCommandV1) -> bool {
+    if model.confidence != "exact" || model.path_overridden || model.segments.is_empty() {
+        return false;
+    }
+    model.segments.iter().all(|segment| {
+        let Some(executable) = segment.executable.as_deref() else {
+            return false;
+        };
+        matches!(
+            executable_basename(executable),
+            "shred" | "mkfs" | "mkfs.ext4" | "shutdown" | "reboot" | "wipefs"
+        ) && matches!(segment.arguments.as_slice(), [argument] if matches!(argument.as_str(), "--help" | "--version"))
+    })
+}
+
 pub fn evaluate_pre_tool(request: &CommandModelRequestV1) -> Result<PreToolDecisionV1, String> {
     let model = parse_command(request)?;
     let normalized = model.normalized_text.as_str();
+    if exact_destructive_tool_introspection(&model) {
+        return Ok(pretool_decision(
+            model,
+            "allow",
+            "native_exact_introspection_command",
+            "The Rust command authority proved this command only inspects tool metadata.",
+        ));
+    }
     if destructive_command(normalized) {
         return Ok(pretool_decision(
             model,
@@ -370,6 +393,15 @@ mod tests {
             "grep -d skip authority README.md",
             "stat README.md",
         ] {
+            let decision = evaluate_pre_tool(&request(command)).unwrap();
+            assert_eq!(decision.decision, "allow", "{command}");
+            assert!(decision.explicitly_benign, "{command}");
+        }
+    }
+
+    #[test]
+    fn allows_exact_destructive_tool_introspection() {
+        for command in ["shutdown --help", "mkfs --version"] {
             let decision = evaluate_pre_tool(&request(command)).unwrap();
             assert_eq!(decision.decision, "allow", "{command}");
             assert!(decision.explicitly_benign, "{command}");

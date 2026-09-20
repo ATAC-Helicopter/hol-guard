@@ -1,4 +1,6 @@
 //! Context-dependent classifiers keep a narrow exact subset and explicit uncertainty.
+use crate::is_contained_compile_check_arguments;
+
 use super::{basename, CanonicalCommandV1, CommandSegmentV1, CompatibilityObservations};
 
 fn sensitive(value: &str) -> bool {
@@ -242,6 +244,7 @@ pub(super) fn observe(
             | "dd"
             | "truncate"
     ) || (executable == "find"
+        && !is_contained_compile_check_arguments(arguments)
         && option(
             arguments,
             &["-delete", "-exec", "-execdir", "-ok", "-okdir"],

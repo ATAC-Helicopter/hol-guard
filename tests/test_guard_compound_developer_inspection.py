@@ -11,8 +11,30 @@ from codex_plugin_scanner.guard.cli.commands_support_runtime_artifacts import (
     _routine_semver_spec_matches,
 )
 from codex_plugin_scanner.guard.models import GuardArtifact
+from tests.native_command_test_support import RealNativeReviewFixture, real_native_review_fixture
 
 
+@pytest.fixture(autouse=True)
+def _real_native_command_reviews(monkeypatch: pytest.MonkeyPatch) -> None:
+    from codex_plugin_scanner.guard.runtime import native_command_evaluation
+    from codex_plugin_scanner.guard.runtime.extension_control_runtime import ExtensionControlRuntimeSnapshot
+
+    fixtures: dict[str, RealNativeReviewFixture] = {}
+
+    def review(command: str, **_kwargs: object) -> dict[str, object]:
+        fixture = fixtures.get(command)
+        if fixture is None:
+            fixture = real_native_review_fixture(command)
+            fixtures[command] = fixture
+        return fixture.payload
+
+    seed = real_native_review_fixture("printf native-fixture")
+    monkeypatch.setattr(native_command_evaluation, "review_pre_tool_native", review)
+    monkeypatch.setattr(
+        ExtensionControlRuntimeSnapshot,
+        "from_authority_view",
+        staticmethod(lambda _view: seed.snapshot),
+    )
 def _artifact(
     command: str,
     *,

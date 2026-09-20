@@ -10,11 +10,10 @@ from codex_plugin_scanner.guard.cli.commands_support_runtime_policy import _runt
 from codex_plugin_scanner.guard.config import GuardConfig
 from codex_plugin_scanner.guard.runtime.command_extensions import (
     BUILT_IN_COMMAND_EXTENSION_REGISTRY,
-    CommandSafetyExtension,
     CommandSafetyExtensionRegistry,
     risk_classes_for_command_action,
 )
-from codex_plugin_scanner.guard.runtime.command_inspection import command_extensions_payload, inspect_command
+from codex_plugin_scanner.guard.runtime.command_inspection import command_extensions_payload
 from codex_plugin_scanner.guard.runtime.extension_control_authority import (
     AuthorityHealth,
     ExtensionControlAuthorityView,
@@ -35,14 +34,18 @@ from codex_plugin_scanner.guard.runtime.extension_control_runtime import (
 from codex_plugin_scanner.guard.runtime.secret_file_requests import (
     ToolActionRequestMatch,
     build_tool_action_request_artifact,
-    extract_sensitive_tool_action_request,
 )
+from tests.generated_command_catalog_test_support import generated_extension
+from tests.native_command_test_support import (
+    extract_sensitive_tool_action_request_native_test as extract_sensitive_tool_action_request,
+)
+from tests.native_command_test_support import inspect_command_native_test as inspect_command
 
 
 @pytest.mark.parametrize(
     ("command", "action_class", "extension_id"),
     [
-        ("git reset --hard HEAD~1", "destructive shell command", "command.git"),
+        ("git reset --hard HEAD~1", "git destructive command", "command.git"),
         ("rm -rf ./build", "destructive shell command", "command.filesystem"),
         ("docker push registry.example.com/app:v1", "docker-sensitive command", "command.container-runtime"),
         (
@@ -348,7 +351,7 @@ def test_required_core_extensions_are_explicit_and_cannot_be_mistaken_for_option
 
 
 def test_command_extension_registry_rejects_duplicate_action_ownership() -> None:
-    extension = CommandSafetyExtension(
+    extension = generated_extension(
         extension_id="command.one",
         version="1.0.0",
         name="One",
@@ -357,7 +360,7 @@ def test_command_extension_registry_rejects_duplicate_action_ownership() -> None
         risk_classes=("destructive_shell",),
         safer_alternatives=("Preview the operation.",),
     )
-    duplicate = CommandSafetyExtension(
+    duplicate = generated_extension(
         extension_id="command.two",
         version="1.0.0",
         name="Two",
@@ -367,7 +370,7 @@ def test_command_extension_registry_rejects_duplicate_action_ownership() -> None
         safer_alternatives=("Preview the operation.",),
     )
 
-    with pytest.raises(ValueError, match="owned by both"):
+    with pytest.raises(ValueError, match="Duplicate command action class"):
         CommandSafetyExtensionRegistry((extension, duplicate))
 
 
@@ -397,6 +400,20 @@ def test_command_cli_emits_stable_json_without_creating_guard_state(
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
+    from codex_plugin_scanner.guard.cli import extension_controls_commands
+
+    requests: list[dict[str, str]] = []
+
+    class NativeInspectionClient:
+        def inspect_command(self, request: dict[str, str]) -> dict[str, object]:
+            requests.append(request)
+            return inspect_command(
+                request["command"],
+                cwd=Path(request["cwd"]),
+                home_dir=Path(request["home_dir"]),
+            )
+
+    monkeypatch.setattr(extension_controls_commands, "_client", lambda _guard_home: NativeInspectionClient())
     monkeypatch.chdir(tmp_path)
     monkeypatch.setenv("HOME", str(tmp_path))
 
@@ -409,6 +426,7 @@ def test_command_cli_emits_stable_json_without_creating_guard_state(
     assert payload["extensions"][0]["extension_id"] == "command.git"
     assert payload["rules"][0]["rule_id"] == "command.git.force-clean"
     assert [item["step"] for item in payload["trace"]][-1] == "risk-signal-derivation"
+    assert requests == [{"command": "git clean -fdx", "cwd": str(tmp_path), "home_dir": str(tmp_path)}]
     assert list(tmp_path.iterdir()) == []
 
 

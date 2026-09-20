@@ -7,7 +7,6 @@ from pathlib import Path
 import pytest
 
 from codex_plugin_scanner.guard.runtime import containment_outputs as outputs_module
-from codex_plugin_scanner.guard.runtime.command_evaluation import evaluate_command
 from codex_plugin_scanner.guard.runtime.command_workspace_write_candidates import (
     workspace_write_candidate_operation,
 )
@@ -22,6 +21,7 @@ from codex_plugin_scanner.guard.runtime.containment_outputs import (
 )
 from tests.guard_command_corpus import iter_adversarial_corpus, iter_benign_corpus
 from tests.guard_command_corpus_oracle import iter_adversarial_oracle, iter_benign_oracle
+from tests.native_command_test_support import real_native_command_evaluation
 
 
 def _write(path: Path, content: str) -> None:
@@ -33,7 +33,9 @@ def test_every_cdx_062_case_retains_exact_review_or_block_floor() -> None:
     benign_count = 0
     operations: set[str] = set()
     for case, oracle in zip(iter_benign_corpus(), iter_benign_oracle(), strict=True):
-        evaluation = evaluate_command(case.command, cwd=Path("workspace"), home_dir=Path("home"))
+        evaluation = real_native_command_evaluation(
+            case.command, cwd=Path("workspace"), home_dir=Path("home")
+        ).evaluation
         operation = workspace_write_candidate_operation(evaluation.command)
         if oracle.owner != "CDX-062":
             assert operation is None
@@ -52,7 +54,9 @@ def test_every_cdx_062_case_retains_exact_review_or_block_floor() -> None:
         if oracle.owner != "CDX-062":
             continue
         adversarial_count += 1
-        evaluation = evaluate_command(case.command, cwd=Path("workspace"), home_dir=Path("home"))
+        evaluation = real_native_command_evaluation(
+            case.command, cwd=Path("workspace"), home_dir=Path("home")
+        ).evaluation
         assert evaluation.minimum_action == "block"
         assert evaluation.decision_plane.action == "block"
         assert evaluation.decision_plane.proof_routes == frozenset()
@@ -64,7 +68,7 @@ def test_every_cdx_062_case_retains_exact_review_or_block_floor() -> None:
     (("ruff format src/module.py", "format-write"), ("cp build/schema.json generated/schema.json", "copy-generated")),
 )
 def test_direct_workspace_writes_use_the_exact_operation_allowlist(command: str, expected: str) -> None:
-    evaluation = evaluate_command(command, cwd=Path("workspace"), home_dir=Path("home"))
+    evaluation = real_native_command_evaluation(command, cwd=Path("workspace"), home_dir=Path("home")).evaluation
     assert workspace_write_candidate_operation(evaluation.command) == expected
     assert evaluation.minimum_action == "review"
     assert evaluation.decision_plane.action == "review"

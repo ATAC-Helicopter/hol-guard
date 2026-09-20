@@ -1,8 +1,8 @@
 """Shadow-only Python bridge to the native command model.
 
-This module compares the native parser through the same version-matched resident
+This module exposes the native parser through the same version-matched resident
 runtime used by the PostToolUse path. Command PreToolUse authority lives in the
-Rust runtime and native_pretool transport.
+Rust runtime and native_pretool transport; Python rule proposals are retired.
 """
 
 from __future__ import annotations
@@ -22,9 +22,7 @@ from .native_runtime_resilience import (
     native_record_resident_failure,
     native_record_resident_success,
 )
-from .runtime.command_evaluation import evaluate_command
 from .runtime.command_model import CanonicalCommand, CommandSegment
-from .runtime.command_shadow_evaluation import CommandShadowCohort, CommandShadowProposal
 
 _MAX_REQUEST_BYTES = 64 * 1024
 _MAX_SEGMENTS = 128
@@ -33,7 +31,6 @@ _PARSER_PROFILE = "posix-simple-v1"
 _REQUIRED_FEATURE = "pre-tool-command-model-shadow-v1"
 _RESIDENT_FEATURE = "resident-command-model-shadow-v1"
 _RESIDENT_PROTOCOL_FEATURE = "resident-protocol-v2"
-_NATIVE_SHADOW_PROPOSAL_VERSION = "guard.command-shadow-proposal.rust-parser.v1"
 
 
 def _plain_int(value: object) -> bool:
@@ -314,13 +311,30 @@ def _canonical_command_from_native(
         transport="shell_string",
         extraction_provenance="guard-shell",
     )
-    if validated is None or validated.get("confidence") != "exact":
+    if validated is None:
         return None
 
     normalized_text = validated.get("normalized_text")
     raw_segments = validated.get("segments")
     if not isinstance(normalized_text, str) or not isinstance(raw_segments, list):
         return None
+    if validated.get("confidence") == "uncertain":
+        uncertainty_reason = validated.get("uncertainty_reason")
+        if not isinstance(uncertainty_reason, str):
+            return None
+        return CanonicalCommand(
+            raw_text=command.strip(),
+            normalized_text=normalized_text,
+            dialect="posix",
+            transport="shell_string",
+            extraction_provenance="guard-shell",
+            wrapper_chain=(),
+            segments=(),
+            redirects=(),
+            embedded_commands=(),
+            confidence="uncertain",
+            uncertainty_reason=uncertainty_reason,
+        )
 
     segments: list[CommandSegment] = []
     for raw_segment in raw_segments:
@@ -396,38 +410,6 @@ def _canonical_command_from_native(
     return canonical
 
 
-def native_command_shadow_proposal(
-    command: str,
-    *,
-    guard_home: Path,
-    cwd: Path | None,
-    home_dir: Path | None,
-    compatibility_action_class: str | None = None,
-    compatibility_reason: str | None = None,
-) -> CommandShadowProposal | None:
-    """Build a privacy-safe shadow proposal from a Rust parse and Python rules."""
-    payload = review_command_model_native(command, guard_home=guard_home)
-    if payload is None:
-        return None
-    canonical = _canonical_command_from_native(command, payload)
-    if canonical is None:
-        return None
-    evaluation = evaluate_command(
-        command,
-        canonical_command=canonical,
-        compatibility_action_class=compatibility_action_class,
-        compatibility_reason=compatibility_reason,
-        cwd=cwd,
-        home_dir=home_dir,
-    )
-    return CommandShadowProposal(
-        decision=evaluation.decision_plane,
-        cohorts=frozenset({CommandShadowCohort.BASELINE}),
-        version=_NATIVE_SHADOW_PROPOSAL_VERSION,
-    )
-
-
 __all__ = [
-    "native_command_shadow_proposal",
     "review_command_model_native",
 ]

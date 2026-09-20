@@ -13,6 +13,27 @@ impl NativeCommandProgram {
             crate::command_compatibility::compatibility_observations(command, deadline)?;
         let mut batch = self.observe_declarative(command, active_extensions, deadline)?;
         for matched in compatibility.rule_matches {
+            let declared_safe_variant = batch.observations.iter().any(|observation| {
+                observation.effective_segment_indexes.is_empty()
+                    && observation
+                        .safe_variants
+                        .iter()
+                        .flat_map(|variant| {
+                            variant
+                                .matcher_evidence
+                                .iter()
+                                .map(|evidence| evidence.segment_index)
+                        })
+                        .collect::<BTreeSet<_>>()
+                        .is_superset(&matched.segment_indexes.iter().copied().collect())
+            });
+            if declared_safe_variant {
+                // A generated source rule already proved this same segment is
+                // a safe variant.  Do not retain an older matcher-less
+                // compatibility attribution that would turn the proof into
+                // an uncertainty or a review floor.
+                continue;
+            }
             let rule = self
                 .rule_indices
                 .get(matched.rule_id)
