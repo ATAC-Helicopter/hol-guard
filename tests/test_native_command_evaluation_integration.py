@@ -149,6 +149,29 @@ def test_real_native_review_classification_accepts_explicit_stash_permission(
     assert reviewed.evaluation.control_resolution.explicitly_enabled_permission_ids == ("command.git.permission.stash",)
 
 
+def test_native_privileged_wrapper_floor_survives_explicit_command_permission(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    fixture = real_native_review_fixture(
+        "sudo -n git push --force origin feature",
+        controls=(("permission", "command.git.permission.force-push", "enabled"),),
+    )
+    assert fixture.payload["minimum_action"] == "require-reapproval"
+    assert fixture.payload["reason_code"] == "native_privileged_wrapper_reapproval"
+    monkeypatch.setattr(native_command_evaluation, "review_pre_tool_native", lambda *_args, **_kwargs: fixture.payload)
+
+    reviewed = native_command_evaluation.review_command_native(
+        fixture.command, guard_home=tmp_path, extension_control_snapshot=fixture.snapshot
+    )
+
+    assert reviewed is not None
+    assert reviewed.evaluation.decision_plane.action == "require-reapproval"
+    assert any(
+        reason.reason_code == "native.privileged-wrapper-reapproval"
+        for reason in reviewed.evaluation.decision_plane.controlling_reasons
+    )
+
+
 def test_native_unsupported_heredoc_remains_bound_blocking_unavailability(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -169,11 +192,15 @@ def test_native_unsupported_heredoc_remains_bound_blocking_unavailability(
     assert fixture.payload["minimum_action"] == "block"
 
     monkeypatch.setattr(native_command_evaluation, "review_pre_tool_native", lambda *_args, **_kwargs: fixture.payload)
-    assert (
-        native_command_evaluation.review_command_native(
-            fixture.command,
-            guard_home=tmp_path,
-            extension_control_snapshot=fixture.snapshot,
-        )
-        is None
+    reviewed = native_command_evaluation.review_command_native(
+        fixture.command,
+        guard_home=tmp_path,
+        extension_control_snapshot=fixture.snapshot,
     )
+    assert reviewed is not None
+    assert reviewed.payload is fixture.payload
+    assert reviewed.snapshot is fixture.snapshot
+    assert reviewed.evaluation.minimum_action == "block"
+    assert reviewed.evaluation.decision_plane.action == "block"
+    assert reviewed.evaluation.matches == ()
+    assert reviewed.evaluation.decision_plane.proof_routes == frozenset()

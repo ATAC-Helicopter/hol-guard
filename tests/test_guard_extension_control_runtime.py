@@ -276,7 +276,6 @@ def test_unavailable_authority_cannot_relax_native_redirect_block(command: str) 
     from codex_plugin_scanner.guard.native_command_model import _canonical_command_from_native
     from codex_plugin_scanner.guard.runtime.command_evaluation import evaluate_command
     from codex_plugin_scanner.guard.runtime.native_command_evaluation import review_command_native
-    from codex_plugin_scanner.guard.runtime.native_command_extension_evidence import NativeCommandExtensionEvidenceError
     from tests.native_command_test_support import real_native_review_fixture
 
     fixture = real_native_review_fixture(command)
@@ -288,8 +287,15 @@ def test_unavailable_authority_cannot_relax_native_redirect_block(command: str) 
     assert fixture.payload["command_extensions"]["observations"] == []
     snapshot = replace(fixture.snapshot, health=AuthorityHealth.UNENROLLED)
     with use_extension_control_snapshot(snapshot):
-        with pytest.raises(NativeCommandExtensionEvidenceError, match="binding_mismatch"):
-            evaluate_command(command, canonical_command=canonical, native_extension_evidence=fixture.payload)
+        evaluation = evaluate_command(command, canonical_command=canonical, native_extension_evidence=fixture.payload)
+        # Valid, request-bound failure evidence remains an authoritative block
+        # even after host authority becomes unavailable. It supplies no match
+        # observations and cannot issue an execution proof.
+        assert evaluation.minimum_action == "block"
+        assert evaluation.decision_plane.action == "block"
+        assert evaluation.matches == ()
+        assert evaluation.decision_plane.proof_routes == frozenset()
+        assert any(reason.reason_code == "native.classification-block" for reason in evaluation.decision_plane.reasons)
         assert review_command_native(command, guard_home=Path("unused-guard-home")) is None
 
 

@@ -64,10 +64,8 @@ from tests.guard_command_corpus_native import (
 from tests.guard_command_corpus_native_contract import configure_native_contract_shard, validate_native_case
 from tests.guard_command_corpus_oracle import iter_adversarial_oracle, iter_benign_oracle
 from tests.guard_command_corpus_oracle_types import OracleRecord
-from tests.guard_command_corpus_runner import peak_rss_mib
+from tests.guard_command_corpus_runner import EVALUATION_SHARD_COUNT, MAX_CONCURRENT_WORKERS, peak_rss_mib
 
-EVALUATION_SHARD_COUNT: Final = 4
-MAX_CONCURRENT_WORKERS: Final = EVALUATION_SHARD_COUNT
 SYNTHETIC_CWD: Final = REPO_ROOT / "workspace"
 SYNTHETIC_HOME: Final = REPO_ROOT / "home"
 
@@ -169,6 +167,7 @@ def _case_evaluations(
         )
         for (case, oracle), reviewed in zip(batch, evaluations, strict=True):
             yield case, oracle, reviewed
+        del evaluations
 
 
 def _case_oracle_pairs(worker_index: int) -> Iterator[tuple[CommandCorpusCase, OracleRecord]]:

@@ -1329,8 +1329,11 @@ def test_tool_action_request_classifier_skips_perl_sleep_wait():
     assert request is None
 
 
-def test_tool_action_request_classifier_blocks_unsupported_coauthored_commit_redirect(tmp_path):
-    from tests.native_command_test_support import extract_sensitive_tool_action_request_native_test
+def test_tool_action_request_classifier_reviews_native_coauthored_commit_redirect(tmp_path):
+    from tests.native_command_test_support import (
+        extract_sensitive_tool_action_request_native_test,
+        real_native_command_evaluation,
+    )
 
     (tmp_path / "hol-guard").mkdir()
     request = extract_sensitive_tool_action_request_native_test(
@@ -1349,9 +1352,15 @@ def test_tool_action_request_classifier_blocks_unsupported_coauthored_commit_red
     )
 
     assert request is not None
-    assert request.action_class == "unmodeled shell command"
-    assert request.guard_default_action == "block"
-    assert request.reason_code == "native-command-classification-block"
+    # Native parsing now supports multiline quoted commit messages and fd
+    # duplication. The add/commit operations keep their normal review owner.
+    assert request.action_class == "git workspace command"
+    assert request.canonical_command is not None
+    assert request.canonical_command.confidence == "exact"
+    assert request.guard_default_action is None
+    native = real_native_command_evaluation(request.command_text, cwd=tmp_path)
+    assert native.native_minimum_action == "review"
+    assert native.evaluation.minimum_action == "review"
 
 
 def test_tool_action_request_classifier_allows_static_markdown_gh_pr_create_body_file(tmp_path):

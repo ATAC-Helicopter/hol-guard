@@ -1,29 +1,46 @@
 from __future__ import annotations
 
-import copy
 import json
+import subprocess
 
 import pytest
 
 from codex_plugin_scanner.guard.runtime.native_command_extension_evidence import (
     NativeCommandExtensionEvidenceError,
 )
+from tests import native_command_test_support as native_support
 from tests.native_command_test_support import (
     project_native_review_fixture,
-    real_native_review_fixture,
     real_native_review_fixtures,
 )
 
 
-def test_batch_matches_independent_source_comparison_and_preserves_order() -> None:
+def test_batch_preserves_order_and_matches_independent_runtime_command_models() -> None:
     commands = ("pwd", "git reset --hard", "git push origin feature")
+    expected = (("allow", None), ("review", "command.git.hard-reset"), ("review", "command.git.push"))
     fixtures = real_native_review_fixtures(commands)
     assert tuple(fixture.command for fixture in fixtures) == commands
-    for command, fixture in zip(commands, fixtures, strict=True):
-        compared = real_native_review_fixture(command, force_rule_ids=("command.git.hard-reset",))
-        expected = copy.deepcopy(compared.payload)
-        expected["command_extensions"]["binding"]["control_effective_digest"] = fixture.snapshot.effective_digest
-        assert fixture.payload == expected
+    _compiler, runtime = native_support._native_binaries()
+    for command, fixture, (minimum_action, rule_id) in zip(commands, fixtures, expected, strict=True):
+        # Exercise the separate runtime CLI, keeping both responses untouched.
+        # Their authority snapshots differ, but command parsing must agree.
+        completed = subprocess.run(
+            [str(runtime), "pre-tool", "--stdin"],
+            input=json.dumps({"command": command}).encode(),
+            capture_output=True,
+            check=False,
+            timeout=10,
+        )
+        assert completed.returncode == 0, completed.stderr.decode(errors="replace")
+        runtime_payload = json.loads(completed.stdout)
+        assert fixture.payload["command_model"] == runtime_payload["command_model"]
+        assert fixture.payload["minimum_action"] == minimum_action
+        evaluation = project_native_review_fixture(fixture).evaluation
+        matched_rule_ids = {owned.match.rule.rule_id for owned in evaluation.matches}
+        if rule_id is None:
+            assert matched_rule_ids == set()
+        else:
+            assert rule_id in matched_rule_ids
 
 
 def test_projection_rejects_native_failure_without_changing_evidence() -> None:

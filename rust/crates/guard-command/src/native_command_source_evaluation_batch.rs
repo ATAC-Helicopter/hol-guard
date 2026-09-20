@@ -16,6 +16,10 @@ struct Request {
     controls: Vec<NativeExtensionControlV1>,
     #[serde(default)]
     managed_controls: Vec<NativeExtensionControlV1>,
+    #[serde(default)]
+    global_lockdown: bool,
+    #[serde(default)]
+    managed_global_lockdown: bool,
 }
 
 #[derive(Deserialize)]
@@ -60,17 +64,18 @@ pub fn evaluate_batch(bytes: &[u8]) -> Result<Value, &'static str> {
     let program = packaged_command_program()?;
     let mut layers = vec![
         serde_json::json!({"schema_version":"1.0.0","kind":"local-admin",
-        "catalog_digest":program.catalog_digest,"global_lockdown":false,"controls":request.controls}),
+        "catalog_digest":program.catalog_digest,"global_lockdown":request.global_lockdown,"controls":request.controls}),
     ];
-    if !request.managed_controls.is_empty() {
+    let managed_layer = !request.managed_controls.is_empty() || request.managed_global_lockdown;
+    if managed_layer {
         layers.push(serde_json::json!({"schema_version":"1.0.0","kind":"signed-cloud",
-            "catalog_digest":program.catalog_digest,"global_lockdown":false,"controls":request.managed_controls}));
+            "catalog_digest":program.catalog_digest,"global_lockdown":request.managed_global_lockdown,"controls":request.managed_controls}));
     }
     let mut binding: NativeCommandControlBindingV1 = serde_json::from_value(serde_json::json!({
         "schema":"guard.native-command-control-binding.v1",
         "program_digest":program.program_digest,"catalog_digest":program.catalog_digest,
         "trust_digest":program.trust_digest,"health":"protected","revision":1,
-        "managed_revision":if request.managed_controls.is_empty() {0} else {1},
+        "managed_revision":if managed_layer {1} else {0},
         "effective_digest":"","layers":layers,
     }))
     .map_err(|_| "command_source_evaluation_batch_binding_invalid")?;
@@ -177,6 +182,34 @@ mod tests {
             evaluate_batch(&serde_json::to_vec(&input).unwrap()).unwrap_err(),
             "native_command_control_target_unknown"
         );
+    }
+
+    #[test]
+    fn global_lockdown_is_bound_even_without_individual_controls() {
+        let baseline: Value = serde_json::from_slice(&request(serde_json::json!([
+            {"id":"safe","command":"pwd"}
+        ])))
+        .unwrap();
+        let allowed = evaluate_batch(&serde_json::to_vec(&baseline).unwrap()).unwrap();
+        for field in ["global_lockdown", "managed_global_lockdown"] {
+            let mut input = baseline.clone();
+            input[field] = serde_json::json!(true);
+            let blocked = evaluate_batch(&serde_json::to_vec(&input).unwrap()).unwrap();
+            let payload = &blocked["cases"][0]["payload"];
+            assert_eq!(payload["minimum_action"], "block");
+            assert_eq!(
+                payload["reason_code"],
+                "native_command_control_authority_block"
+            );
+            assert_ne!(
+                blocked["control_binding"]["effective_digest"],
+                allowed["control_binding"]["effective_digest"]
+            );
+            assert_eq!(
+                blocked["control_binding"]["managed_revision"],
+                usize::from(field == "managed_global_lockdown")
+            );
+        }
     }
 
     #[test]

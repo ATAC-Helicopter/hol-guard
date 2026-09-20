@@ -6,6 +6,7 @@ from pathlib import Path
 
 from codex_plugin_scanner.guard.config import resolve_guard_home
 from codex_plugin_scanner.guard.risk import artifact_risk_signals_v2
+from codex_plugin_scanner.guard.runtime.command_evaluation import evaluate_command
 from codex_plugin_scanner.guard.runtime.command_extensions import (
     BUILT_IN_COMMAND_EXTENSION_REGISTRY,
     COMMAND_EXTENSION_SCHEMA_VERSION,
@@ -115,6 +116,21 @@ def inspect_command(
         canonical_command=canonical_command,
         native_evaluation=evaluation,
     )
+    if match is not None:
+        # Preserve the classifier's more specific diagnostic label, using the
+        # same request-bound native observations and authenticated controls.
+        # Compatibility metadata cannot add native rule ownership or remove a
+        # native block; this is the projection used for the matching artifact.
+        evaluation = evaluate_command(
+            command_text,
+            canonical_command=canonical_command,
+            compatibility_action_class=match.action_class,
+            compatibility_reason=match.reason,
+            cwd=workspace,
+            home_dir=home,
+            extension_control_snapshot=reviewed.snapshot,
+            native_extension_evidence=reviewed.payload,
+        )
     trace: list[dict[str, object]] = [
         {
             "step": "canonical-parse",

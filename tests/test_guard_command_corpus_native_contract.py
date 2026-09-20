@@ -37,18 +37,20 @@ def test_native_contract_keeps_complete_original_inputs_and_visible_stronger_dif
     metadata = contract.load_native_contract()
     assert len(groups) == 58
     assert sum(count for count, _ in groups.values()) == 51_000
-    assert sum(count for count, _ in original.values()) == 11_608
+    assert sum(count for count, _ in original.values()) == 11_558
     assert rejected["native_command_evaluation_failed"][0] == 27_084
     assert metadata["totals"] == {
         "cases": 51_000,
         "sources": 52,
         "groups": 58,
-        "equal_to_original_oracle": 39_392,
-        "stronger_than_original_oracle": 11_608,
+        "equal_to_original_oracle": 39_442,
+        "stronger_than_original_oracle": 11_558,
         "below_original_oracle": 0,
         "native_evaluation_errors": 27_084,
         "improved_upstream_benign_sources": 3,
         "improved_upstream_benign_cases": 75,
+        "improved_bounded_git_sources": 2,
+        "improved_bounded_git_cases": 50,
     }
 
 
@@ -147,7 +149,7 @@ def test_native_contract_rejects_changed_failure_signatures_even_when_action_is_
 def test_native_contract_rejects_missing_owned_uncertainty_even_when_action_is_still_block(
     native_samples: dict[str, tuple[CommandCorpusCase, OracleRecord, NativeCommandEvaluation]],
 ) -> None:
-    case, oracle, reviewed = native_samples["workflow:navigation-public-read:repository-root|all"]
+    case, oracle, reviewed = native_samples["workflow:workspace-patch-write:patch-apply|all"]
     payload = copy.deepcopy(reviewed.payload)
     evidence = cast(dict[str, object], payload["command_extensions"])
     observations = cast(list[dict[str, object]], evidence["observations"])

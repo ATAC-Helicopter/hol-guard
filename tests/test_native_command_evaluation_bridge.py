@@ -101,7 +101,7 @@ def test_inspection_native_evaluation_failure_preserves_block_without_reparsing(
 ) -> None:
     from tests.native_command_test_support import real_native_command_evaluation
 
-    command = "sudo --command-timeout 10 git push origin main --force"
+    command = "sudo -u alternate-user git push origin main --force"
     reviewed = real_native_command_evaluation(command, cwd=tmp_path, home_dir=tmp_path)
     original = deepcopy(reviewed.payload)
     assert reviewed.payload["command_extensions"]["evaluation_error"] == "native_command_evaluation_failed"

@@ -16,8 +16,10 @@ from itertools import chain, islice
 from pathlib import Path
 from typing import TypedDict, cast
 
-EVALUATION_SHARD_COUNT = 4
-MAX_CONCURRENT_WORKERS = 4
+# Each shard has both a Python evaluator and a native subprocess. Keep the
+# aggregate peak below the 512 MiB corpus budget, including coverage overhead.
+EVALUATION_SHARD_COUNT = 3
+MAX_CONCURRENT_WORKERS = EVALUATION_SHARD_COUNT
 WORKER_TIMEOUT_SECONDS = 60
 REPO_ROOT = Path(__file__).parents[1]
 SYNTHETIC_CWD = REPO_ROOT / "workspace"
@@ -145,6 +147,9 @@ def _worker_report(worker_index: int, worker_count: int) -> WorkerReport:
             kind = "underclassified" if ranks[observed] < ranks[oracle.minimum_floor] else "overclassified"
             key = "|".join((oracle.owner, kind, oracle.minimum_floor, observed))
             groups[key].append(case.case_id)
+        # Release native evidence before constructing the next batch. Keeping
+        # the previous result alive doubles the live projection payloads.
+        del evaluations
     return {
         "groups": dict(groups),
         "native_contract_groups": dict(native_contract_groups),

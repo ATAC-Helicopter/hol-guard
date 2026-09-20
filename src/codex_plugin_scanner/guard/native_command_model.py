@@ -12,6 +12,7 @@ import time
 from pathlib import Path
 from typing import Any
 
+from .native_command_model_wrappers import decode_sudo_prefix
 from .native_resident_client import (
     native_resident_client_request,
     record_native_resident_client_failure_code,
@@ -28,6 +29,7 @@ _MAX_REQUEST_BYTES = 64 * 1024
 _MAX_SEGMENTS = 128
 _MAX_TOKENS = 2_048
 _PARSER_PROFILE = "posix-simple-v1"
+_WRAPPER_PARSER_PROFILE = "posix-bounded-wrappers-v2"
 _REQUIRED_FEATURE = "pre-tool-command-model-shadow-v1"
 _RESIDENT_FEATURE = "resident-command-model-shadow-v1"
 _RESIDENT_PROTOCOL_FEATURE = "resident-protocol-v2"
@@ -66,6 +68,7 @@ def _decode_command_model(
     confidence = payload.get("confidence")
     uncertainty_reason = payload.get("uncertainty_reason")
     path_overridden = payload.get("path_overridden")
+    profile = payload.get("parser_profile")
     if (
         not isinstance(normalized_text, str)
         or not normalized_text
@@ -73,17 +76,26 @@ def _decode_command_model(
         or payload.get("dialect") != dialect
         or payload.get("transport") != transport
         or payload.get("extraction_provenance") != extraction_provenance
-        or wrapper_chain != []
+        or not isinstance(wrapper_chain, list)
+        or len(wrapper_chain) > _MAX_SEGMENTS * 4
+        or any(wrapper != "sudo" for wrapper in wrapper_chain)
         or not isinstance(segments, list)
         or len(segments) > _MAX_SEGMENTS
         or confidence not in {"exact", "uncertain"}
         or not isinstance(path_overridden, bool)
-        or payload.get("parser_profile") != _PARSER_PROFILE
+        or profile not in {_PARSER_PROFILE, _WRAPPER_PARSER_PROFILE}
     ):
         return None
 
     if confidence == "uncertain":
-        if segments or not isinstance(uncertainty_reason, str) or not uncertainty_reason.strip() or path_overridden:
+        if (
+            segments
+            or wrapper_chain
+            or profile != _PARSER_PROFILE
+            or not isinstance(uncertainty_reason, str)
+            or not uncertainty_reason.strip()
+            or path_overridden
+        ):
             return None
         return payload
     if uncertainty_reason is not None or not segments:
@@ -94,6 +106,7 @@ def _decode_command_model(
     previous_end = 0
     previous_group = -1
     previous_pipeline = -1
+    aggregate_wrappers: list[str] = []
     for index, segment in enumerate(segments):
         if not isinstance(segment, dict):
             return None
@@ -118,7 +131,9 @@ def _decode_command_model(
             or not all(isinstance(value, str) for value in arguments)
             or not isinstance(environment_names, list)
             or not all(isinstance(value, str) for value in environment_names)
-            or segment_wrappers != []
+            or not isinstance(segment_wrappers, list)
+            or len(segment_wrappers) > 4
+            or any(wrapper != "sudo" for wrapper in segment_wrappers)
             or (executable is not None and not isinstance(executable, str))
             or not isinstance(segment_path_overridden, bool)
             or not isinstance(execution_context, str)
@@ -173,6 +188,15 @@ def _decode_command_model(
                 break
             expected_environment_names.append(name)
             executable_index += 1
+        if profile == _WRAPPER_PARSER_PROFILE:
+            decoded_prefix = decode_sudo_prefix(tokens, executable_index)
+            if decoded_prefix is None:
+                return None
+            executable_index, expected_wrappers = decoded_prefix
+            if segment_wrappers != expected_wrappers:
+                return None
+        elif segment_wrappers:
+            return None
         expected_executable = tokens[executable_index] if executable_index < len(tokens) else None
         expected_arguments = tokens[executable_index + 1 :] if expected_executable is not None else []
         expected_path_override = "PATH" in expected_environment_names
@@ -188,11 +212,16 @@ def _decode_command_model(
         if total_tokens > _MAX_TOKENS:
             return None
         aggregate_path_override = aggregate_path_override or segment_path_overridden
+        aggregate_wrappers.extend(segment_wrappers)
         previous_end = end
         previous_group = group_index
         previous_pipeline = pipeline_index
 
-    if path_overridden != aggregate_path_override:
+    if (
+        path_overridden != aggregate_path_override
+        or wrapper_chain != aggregate_wrappers
+        or (profile == _WRAPPER_PARSER_PROFILE) != bool(wrapper_chain)
+    ):
         return None
     return payload
 
@@ -383,7 +412,7 @@ def _canonical_command_from_native(
                 executable=executable,
                 arguments=tuple(arguments),
                 environment_names=tuple(environment_names),
-                wrapper_chain=(),
+                wrapper_chain=tuple(raw_segment["wrapper_chain"]),
                 path_overridden=path_overridden,
                 execution_context=execution_context,
                 pipeline_index=pipeline_index,
@@ -398,7 +427,7 @@ def _canonical_command_from_native(
         dialect="posix",
         transport="shell_string",
         extraction_provenance="guard-shell",
-        wrapper_chain=(),
+        wrapper_chain=tuple(validated["wrapper_chain"]),
         segments=tuple(segments),
         redirects=(),
         embedded_commands=(),
