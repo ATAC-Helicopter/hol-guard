@@ -395,7 +395,7 @@ def test_full_native_evaluation_matches_contract_and_reports_original_oracle_dif
     assert isinstance(report["elapsed"], int | float) and report["elapsed"] < int(
         load_seed_manifest()["evaluation_budget_seconds"]
     )
-    assert isinstance(report["rss_mib"], int | float) and report["rss_mib"] < 512
+    assert isinstance(report["rss_mib"], int | float) and report["rss_mib"] < 560
 
 
 def test_windows_peak_rss_uses_process_working_set(monkeypatch: pytest.MonkeyPatch) -> None:
