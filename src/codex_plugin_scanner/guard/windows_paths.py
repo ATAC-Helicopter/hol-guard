@@ -9,7 +9,8 @@ import os
 import stat
 import time
 import uuid
-from contextlib import suppress
+from collections.abc import Callable, Iterator
+from contextlib import contextmanager, suppress
 from ctypes import wintypes
 from pathlib import Path
 
@@ -18,8 +19,10 @@ _WINDOWS_FILE_ATTRIBUTE_DIRECTORY = 0x00000010
 _FILE_ATTRIBUTE_REPARSE_POINT = 0x00000400
 _WINDOWS_FILE_FLAG_OPEN_REPARSE_POINT = 0x00200000
 _WINDOWS_FILE_FLAG_SEQUENTIAL_SCAN = 0x08000000
+_WINDOWS_FILE_FLAG_BACKUP_SEMANTICS = 0x02000000
 _WINDOWS_GENERIC_READ = 0x80000000
 _WINDOWS_FILE_SHARE_READ = 0x00000001
+_WINDOWS_FILE_SHARE_WRITE = 0x00000002
 _WINDOWS_OPEN_EXISTING = 3
 _WINDOWS_ERROR_INVALID_PARAMETER = 87
 _WINDOWS_ERROR_SHARING_VIOLATION = 32
@@ -68,6 +71,48 @@ def open_windows_locked_regular_descriptor(
     that physical path, including when an ancestor junction changes at open.
     """
 
+    try:
+        msvcrt = importlib.import_module("msvcrt")
+        handle, close_handle = _open_windows_locked_handle(path, expected_resolved_path=expected_resolved_path)
+        try:
+            return int(
+                msvcrt.open_osfhandle(
+                    handle,
+                    os.O_RDONLY | getattr(os, "O_BINARY", 0) | getattr(os, "O_NOINHERIT", 0),
+                )
+            )
+        except BaseException:
+            _ = close_handle(handle)
+            raise
+    except (AttributeError, ImportError, RuntimeError, TypeError, ValueError) as exc:
+        raise OSError("windows_locked_file_unavailable") from exc
+
+
+@contextmanager
+def hold_windows_locked_directory(
+    path: Path | str,
+    *,
+    expected_resolved_path: Path | str,
+) -> Iterator[None]:
+    """Pin a canonical physical directory while inspecting its children."""
+
+    handle, close_handle = _open_windows_locked_handle(
+        path,
+        expected_resolved_path=expected_resolved_path,
+        directory=True,
+    )
+    try:
+        yield
+    finally:
+        _ = close_handle(handle)
+
+
+def _open_windows_locked_handle(
+    path: Path | str,
+    *,
+    expected_resolved_path: Path | str | None,
+    directory: bool = False,
+) -> tuple[int, Callable[[int], object]]:
     if os.name != "nt":
         raise OSError("windows_locked_file_unavailable")
     win_dll = getattr(ctypes, "WinDLL", None)
@@ -76,7 +121,6 @@ def open_windows_locked_regular_descriptor(
     handle: object | None = None
     close_handle = None
     try:
-        msvcrt = importlib.import_module("msvcrt")
         kernel32 = win_dll("kernel32", use_last_error=True)
         create_file = kernel32.CreateFileW
         create_file.argtypes = [
@@ -103,16 +147,20 @@ def open_windows_locked_regular_descriptor(
             handle = create_file(
                 str(path),
                 _WINDOWS_GENERIC_READ,
-                _WINDOWS_FILE_SHARE_READ,
+                _WINDOWS_FILE_SHARE_READ | (_WINDOWS_FILE_SHARE_WRITE if directory else 0),
                 None,
                 _WINDOWS_OPEN_EXISTING,
-                _WINDOWS_FILE_FLAG_OPEN_REPARSE_POINT | _WINDOWS_FILE_FLAG_SEQUENTIAL_SCAN,
+                _WINDOWS_FILE_FLAG_OPEN_REPARSE_POINT
+                | (_WINDOWS_FILE_FLAG_BACKUP_SEMANTICS if directory else _WINDOWS_FILE_FLAG_SEQUENTIAL_SCAN),
                 None,
             )
             if handle not in {None, invalid_handle}:
                 break
-            sharing_violation = ctypes.get_last_error() == _WINDOWS_ERROR_SHARING_VIOLATION
+            last_error = ctypes.get_last_error()
+            sharing_violation = last_error == _WINDOWS_ERROR_SHARING_VIOLATION
             handle = None
+            if directory and last_error in {2, 3}:
+                raise FileNotFoundError("windows_locked_directory_missing")
             if not sharing_violation or attempt + 1 == _WINDOWS_LOCK_OPEN_ATTEMPTS:
                 raise OSError("windows_locked_file_open_failed")
             time.sleep(_WINDOWS_LOCK_RETRY_SECONDS)
@@ -120,7 +168,8 @@ def open_windows_locked_regular_descriptor(
         if not get_information(handle, ctypes.byref(information)):
             raise OSError("windows_locked_file_inspection_failed")
         attributes = int(information.dwFileAttributes)
-        if attributes & (_WINDOWS_FILE_ATTRIBUTE_DIRECTORY | _FILE_ATTRIBUTE_REPARSE_POINT):
+        is_directory = bool(attributes & _WINDOWS_FILE_ATTRIBUTE_DIRECTORY)
+        if attributes & _FILE_ATTRIBUTE_REPARSE_POINT or is_directory != directory:
             raise OSError("windows_locked_file_not_regular")
         if expected_resolved_path is not None:
             get_final_path = kernel32.GetFinalPathNameByHandleW
@@ -138,14 +187,8 @@ def open_windows_locked_regular_descriptor(
         handle_value = handle if isinstance(handle, int) else getattr(handle, "value", None)
         if not isinstance(handle_value, int):
             raise OSError("windows_locked_file_handle_invalid")
-        descriptor = int(
-            msvcrt.open_osfhandle(
-                handle_value,
-                os.O_RDONLY | getattr(os, "O_BINARY", 0) | getattr(os, "O_NOINHERIT", 0),
-            )
-        )
         handle = None
-        return descriptor
+        return handle_value, close_handle
     except (AttributeError, ImportError, RuntimeError, TypeError, ValueError) as exc:
         raise OSError("windows_locked_file_unavailable") from exc
     finally:
@@ -494,6 +537,7 @@ def _trusted_real_directory(path: Path) -> Path:
 
 
 __all__ = [
+    "hold_windows_locked_directory",
     "open_windows_locked_regular_descriptor",
     "trusted_windows_roaming_appdata",
     "trusted_windows_system_directories",

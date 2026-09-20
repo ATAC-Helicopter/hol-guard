@@ -36,9 +36,11 @@ def _queue_operation(
     *,
     harness: str,
     severity: str,
+    request_workspace: Path | None = None,
+    explicit_workspace: bool = False,
 ) -> tuple[GuardStore, GuardSurfaceRuntime, dict[str, object]]:
     guard_home = root / "guard-home"
-    workspace = root / "workspace"
+    workspace = request_workspace or root / "workspace"
     _write_attention_config(guard_home)
     store = GuardStore(guard_home)
     runtime = GuardSurfaceRuntime(store)
@@ -79,6 +81,7 @@ def _queue_operation(
                     "source_scope": artifact.source_scope,
                     "config_path": artifact.config_path,
                     "workspace": str(workspace),
+                    "effective_workspace": str(workspace) if explicit_workspace else None,
                     "policy_action": "require-reapproval",
                     "changed_fields": ["command"],
                     "decision_v2_json": {
@@ -214,7 +217,7 @@ def test_attention_policy_does_not_reopen_same_critical_request(tmp_path: Path) 
 
 
 def test_attention_severity_uses_structured_signals() -> None:
-    request = {
+    request: dict[str, object] = {
         "decision_v2_json": {
             "signals": [
                 {"severity": "low"},
@@ -267,3 +270,103 @@ def test_attention_settings_round_trip_and_validate(tmp_path: Path) -> None:
         update_guard_settings(guard_home, {"approval_browser_delay_seconds": 301})
     with pytest.raises(ValueError, match="Invalid immediate"):
         update_guard_settings(guard_home, {"approval_browser_immediate_severity": "unknown"})
+
+
+@pytest.mark.parametrize("explicit_workspace", [False, True])
+def test_attention_rejects_unauthorized_workspace_before_config_read_without_rewriting_scope(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, explicit_workspace: bool
+) -> None:
+    from codex_plugin_scanner.guard.directory_path_authority import DirectoryPathTrustError
+    from codex_plugin_scanner.guard.runtime import approval_attention as attention_module
+
+    outside = Path(tmp_path.anchor) / "outside-authorized-guard-roots"
+    store, runtime, result = _queue_operation(
+        tmp_path,
+        harness="pi",
+        severity="high",
+        request_workspace=outside,
+        explicit_workspace=explicit_workspace,
+    )
+    requests = result["approval_requests"]
+    assert isinstance(requests, list)
+    request = requests[0]
+    assert isinstance(request, dict)
+    assert request["workspace"] == str(outside)
+
+    def forbidden_config_read(*_args, **_kwargs):
+        raise AssertionError("untrusted request workspace must be rejected before configuration is read")
+
+    monkeypatch.setattr(attention_module, "load_guard_config", forbidden_config_read)
+    opened_urls: list[str] = []
+    with pytest.raises(DirectoryPathTrustError, match="unexpected_root"):
+        _schedule(store, runtime, result, now=[0.0], opened_urls=opened_urls)
+    assert opened_urls == []
+    persisted = store.get_approval_request(str(request["request_id"]))
+    assert persisted is not None
+    assert persisted["workspace"] == str(outside)
+    assert persisted["status"] == "pending"
+
+
+def test_attention_loads_authorized_owned_temporary_workspace_config(tmp_path: Path) -> None:
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    (workspace / ".hol-guard.toml").write_text("approval_browser_delay_seconds = 45\n", encoding="utf-8")
+    store, runtime, result = _queue_operation(
+        tmp_path / "guard-root",
+        harness="pi",
+        severity="medium",
+        request_workspace=workspace,
+    )
+    requests = result["approval_requests"]
+    assert isinstance(requests, list)
+    coordinator = ApprovalAttentionCoordinator(store=store, runtime=runtime, opener=lambda _url: True)
+
+    config = coordinator._config_for_requests(requests)
+    assert config.approval_browser_delay_seconds == 45
+
+
+def test_attention_with_no_workspace_uses_trusted_home_config(tmp_path: Path) -> None:
+    store, runtime, _result = _queue_operation(tmp_path, harness="pi", severity="medium")
+    coordinator = ApprovalAttentionCoordinator(store=store, runtime=runtime, opener=lambda _url: True)
+
+    config = coordinator._config_for_requests([{"workspace": None}])
+    assert config.approval_browser_delay_seconds == 20
+
+
+def test_attention_rejects_directory_alias_substitution_between_authorization_and_read(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from codex_plugin_scanner.guard.config_file_io import ConfigFileTrustError
+    from codex_plugin_scanner.guard.runtime import approval_attention as attention_module
+
+    workspace = tmp_path / "guard-root" / "workspace"
+    workspace.mkdir(parents=True)
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    (outside / ".hol-guard.toml").write_text("approval_browser_delay_seconds = 1\n", encoding="utf-8")
+    # Check platform support before queuing the authority-bound operation.
+    probe = tmp_path / "link-probe"
+    try:
+        probe.symlink_to(outside, target_is_directory=True)
+        probe.unlink()
+    except OSError as error:
+        pytest.skip(f"symlink creation unavailable: {error}")
+    store, runtime, result = _queue_operation(
+        tmp_path / "guard-root", harness="pi", severity="medium", request_workspace=workspace
+    )
+    original_load = attention_module.load_guard_config
+
+    def substitute_then_load(guard_home, authorized_workspace, **kwargs):
+        assert authorized_workspace == workspace.resolve()
+        assert kwargs["require_canonical_workspace"] is True
+        workspace.rename(tmp_path / "authorized-workspace")
+        workspace.symlink_to(outside, target_is_directory=True)
+        return original_load(guard_home, authorized_workspace, **kwargs)
+
+    monkeypatch.setattr(attention_module, "load_guard_config", substitute_then_load)
+    coordinator = ApprovalAttentionCoordinator(store=store, runtime=runtime, opener=lambda _url: True)
+    requests = result["approval_requests"]
+    assert isinstance(requests, list)
+
+    with pytest.raises(ConfigFileTrustError):
+        coordinator._config_for_requests(requests)

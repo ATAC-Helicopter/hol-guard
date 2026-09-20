@@ -33,7 +33,14 @@ def unavailable_command_inspection(
     command_text = command.strip()
     if not command_text:
         raise ValueError("Command text cannot be empty")
-    preview = canonical_command or parse_shell_command(command_text, cwd=cwd, home_dir=home_dir)
+    if canonical_command is None:
+        preview = parse_shell_command(command_text, cwd=cwd, home_dir=home_dir)
+        normalized_command = command_text
+        wrapper_chain: list[str] = []
+    else:
+        preview = canonical_command
+        normalized_command = preview.normalized_text
+        wrapper_chain = list(preview.wrapper_chain)
     return {
         "schema_version": COMMAND_EXTENSION_SCHEMA_VERSION,
         "status": "native_unavailable",
@@ -47,8 +54,8 @@ def unavailable_command_inspection(
                 if native_evaluation_failed
                 else "Native inspection is unavailable. Check native runtime and command-control status."
             ),
-            "normalized_command": preview.normalized_text if canonical_command is not None else command_text,
-            "wrapper_chain": list(preview.wrapper_chain) if canonical_command is not None else [],
+            "normalized_command": normalized_command,
+            "wrapper_chain": wrapper_chain,
         },
         "risk_classes": [],
         "minimum_action": "block" if native_evaluation_failed else "review",

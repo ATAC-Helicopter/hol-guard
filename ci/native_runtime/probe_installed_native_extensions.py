@@ -13,6 +13,7 @@ import json
 import os
 import secrets
 import tempfile
+import threading
 import time
 from collections.abc import Mapping
 from pathlib import Path
@@ -27,9 +28,14 @@ from codex_plugin_scanner.guard.extension_builder.native_source_compiler import 
     run_source_compiler,
     validate_source,
 )
-from codex_plugin_scanner.guard.native_approval_errors import NATIVE_COMMAND_CONTROL_ERROR_CODES
+from codex_plugin_scanner.guard.native_approval_errors import (
+    NATIVE_APPROVAL_ERROR_CODES,
+    NATIVE_COMMAND_CONTROL_ERROR_CODES,
+    NATIVE_RESIDENT_LIFECYCLE_ERROR_CODES,
+)
 from codex_plugin_scanner.guard.native_command_control_authority import AUTHORITY_FILE_NAME
 from codex_plugin_scanner.guard.native_hook_edge import review_raw_hook_native
+from codex_plugin_scanner.guard.native_policy_snapshot_constants import _PUBLISH_TIMEOUT_SECONDS
 from codex_plugin_scanner.guard.native_resident_client import (
     close_native_residents,
     native_resident_client_failure_code,
@@ -349,14 +355,81 @@ def control(kind: ControlTargetKind, target: str, state: ControlState) -> Extens
     return ExtensionControl(ControlTarget(kind, target), state)
 
 
-def ready(daemon: GuardDaemonServer, workspace: Path, revision: int) -> dict[str, object]:
+def policy_readiness_diagnostic(publisher: object) -> dict[str, object]:
+    """Expose bounded lifecycle state without policy, path, or exception text."""
+
+    allowed_errors = (
+        NATIVE_APPROVAL_ERROR_CODES
+        | NATIVE_COMMAND_CONTROL_ERROR_CODES
+        | NATIVE_RESIDENT_LIFECYCLE_ERROR_CODES
+        | {
+            "native_policy_snapshot_ack_invalid",
+            "native_policy_snapshot_ack_mismatch",
+            "native_policy_snapshot_expired",
+            "native_policy_snapshot_integrity_key_unavailable",
+            "native_policy_snapshot_native_disabled",
+            "native_policy_snapshot_protocol_unsupported",
+            "native_policy_snapshot_publish_failed",
+            "native_policy_snapshot_resident_changed",
+            "native_policy_snapshot_runtime_unavailable",
+            "attributeerror",
+            "databaseerror",
+            "filenotfounderror",
+            "integrityerror",
+            "operationalerror",
+            "oserror",
+            "permissionerror",
+            "runtimeerror",
+            "timeouterror",
+            "typeerror",
+            "valueerror",
+        }
+    )
+    error = getattr(publisher, "last_error", None)
+    closed = getattr(publisher, "closed", None)
+    thread = getattr(publisher, "_thread", None)
+    return {
+        "last_error_code": error if isinstance(error, str) and error in allowed_errors else None,
+        "last_error_present": error is not None,
+        "closed": closed if type(closed) is bool else None,
+        "thread_alive": thread.is_alive() if isinstance(thread, threading.Thread) else None,
+    }
+
+
+def ready(
+    daemon: GuardDaemonServer,
+    workspace: Path,
+    revision: int,
+    *,
+    previous_publisher: object | None = None,
+) -> dict[str, object]:
     worker = daemon._server.hook_worker
-    deadline = time.monotonic() + 5
+    # This functional fixture awaits a production publication, including a
+    # cold Windows restart. Keep one bound for publication and admission, and
+    # do not expire before the publisher's own platform timeout. Installed
+    # readiness latency is enforced separately by native_slo_contract.
+    deadline = time.monotonic() + max(5.0, _PUBLISH_TIMEOUT_SECONDS)
     publisher = worker.policy_snapshot_publisher
     publisher.register_workspace(workspace)
     publisher.start()
     # Await asynchronous control publication before measuring hook admission.
-    require(publisher.wait_until_ready(deadline), "policy_not_ready")
+    published = publisher.wait_until_ready(deadline)
+    if not published:
+        print(
+            json.dumps(
+                {
+                    "schema": "guard.installed-native-extension-readiness-failure.v1",
+                    "stage": "publication",
+                    "publisher": policy_readiness_diagnostic(publisher),
+                    "previous_publisher": (
+                        policy_readiness_diagnostic(previous_publisher) if previous_publisher is not None else None
+                    ),
+                },
+                sort_keys=True,
+            ),
+            flush=True,
+        )
+    require(published, "policy_not_ready")
     binding = worker.prepare_workspace_policy(workspace, deadline=deadline)
     require(binding is not None, "policy_not_ready")
     snapshot = publisher.current_snapshot()
@@ -380,6 +453,7 @@ def exercise(root: Path) -> dict[str, object]:
     daemon = GuardDaemonServer(store, host="127.0.0.1", port=0, home_dir=root, workspace_dir=workspace)
     rows: list[dict[str, object]] = []
     all_receipts: list[str] = []
+    previous_publisher: object | None = None
 
     def case(
         label: str,
@@ -392,7 +466,7 @@ def exercise(root: Path) -> dict[str, object]:
         tool_payload: dict[str, object] | None = None,
         permission_id: str | None = None,
     ) -> dict:
-        binding = ready(daemon, workspace, revision)
+        binding = ready(daemon, workspace, revision, previous_publisher=previous_publisher)
         payload = tool_payload or {
             "hook_event_name": "PreToolUse",
             "tool_name": "Bash",
@@ -508,6 +582,7 @@ def exercise(root: Path) -> dict[str, object]:
         case("external-disabled", "ollama rm example-model", revision, matched=None)
         revision = commit_controls(store, password, (enabled,))
         case("external-reenabled", "ollama push example-model", revision, matched="command.ollama.push")
+        previous_publisher = daemon._server.hook_worker.policy_snapshot_publisher
         daemon.stop()
         require(close_native_residents(home), "restart_containment")
         daemon = GuardDaemonServer(store, host="127.0.0.1", port=0, home_dir=root, workspace_dir=workspace)
