@@ -129,6 +129,8 @@ def main() -> None:
             "pnpm uivoid@latest create my-app",
             "yarn uivoid@latest create my-app",
             "npx uivoid@ create my-app",
+            "npm exec uivoid@ create my-app",
+            "pnpm dlx uivoid@ create my-app",
         }
     )
     fixtures = []

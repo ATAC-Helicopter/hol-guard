@@ -234,9 +234,7 @@ class VersionedPackageSubcommandMatcher:
                 self.interspersed_flags,
             )
             normalized = tuple(
-                self.package
-                if token == self.package or (token.startswith(package_prefix) and len(token) > len(package_prefix))
-                else token
+                self.package if token == self.package or token.startswith(package_prefix) else token
                 for token in filtered
             )
             if normalized[: len(prefix)] != prefix:

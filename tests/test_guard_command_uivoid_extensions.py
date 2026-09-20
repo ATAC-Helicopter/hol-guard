@@ -132,6 +132,11 @@ UIVOID_WRAPPER_REVIEW_COMMANDS: tuple[tuple[str, str], ...] = (
     ("npx uivoid@latest login --token pat_abc123", "command.uivoid.login"),
     ("npx uivoid@latest skill --install", "command.uivoid.skill-install"),
     ("NPX UIVOID@LATEST CREATE MY-APP", "command.uivoid.create"),
+    # A bare trailing `@` is not a typo to ignore: npm's own package-arg
+    # parser resolves `uivoid@` identically to unversioned `uivoid` (rawSpec
+    # "*"), so it really does run the real package and must reach review.
+    ("npx uivoid@ create my-app", "command.uivoid.create"),
+    ("npm exec uivoid@ create my-app", "command.uivoid.create"),
 )
 
 UIVOID_VERSIONED_PACKAGE_SAFE_COMMANDS: tuple[str, ...] = (

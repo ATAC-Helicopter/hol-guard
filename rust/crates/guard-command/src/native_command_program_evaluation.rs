@@ -242,10 +242,7 @@ impl Evaluation<'_> {
             let normalized: Vec<String> = filtered
                 .iter()
                 .map(|token| {
-                    if *token == node.package
-                        || (token.starts_with(&package_prefix)
-                            && token.len() > package_prefix.len())
-                    {
+                    if *token == node.package || token.starts_with(&package_prefix) {
                         node.package.clone()
                     } else {
                         token.clone()
