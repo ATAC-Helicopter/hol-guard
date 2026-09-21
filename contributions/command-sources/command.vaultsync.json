@@ -211,7 +211,8 @@
                 "forbidden_flags": [],
                 "interspersed_flags": [
                   "--quiet",
-                  "--json"
+                  "--json",
+                  "--dry-run"
                 ],
                 "interspersed_options_with_values": [
                   "--keep-last",
@@ -249,7 +250,8 @@
                 "interspersed_flags": [
                   "--dry-run",
                   "--quiet",
-                  "--json"
+                  "--json",
+                  "--help"
                 ],
                 "interspersed_options_with_values": [
                   "--keep-last",
@@ -344,7 +346,8 @@
                   "--clean",
                   "--keep-empty-dirs",
                   "--quiet",
-                  "--json"
+                  "--json",
+                  "--dry-run"
                 ],
                 "interspersed_options_with_values": [
                   "--snapshot",
@@ -383,7 +386,8 @@
                   "--clean",
                   "--keep-empty-dirs",
                   "--quiet",
-                  "--json"
+                  "--json",
+                  "--help"
                 ],
                 "interspersed_options_with_values": [
                   "--snapshot",
@@ -471,7 +475,8 @@
                 "forbidden_flags": [],
                 "interspersed_flags": [
                   "--yes",
-                  "--quiet"
+                  "--quiet",
+                  "--help"
                 ],
                 "interspersed_options_with_values": [
                   "--db"
@@ -594,7 +599,8 @@
                     "fail_secure_unknown_options": true,
                     "forbidden_flags": [],
                     "interspersed_flags": [
-                      "--quiet"
+                      "--quiet",
+                      "--help"
                     ],
                     "interspersed_options_with_values": [
                       "--db"
@@ -624,7 +630,8 @@
                     "fail_secure_unknown_options": true,
                     "forbidden_flags": [],
                     "interspersed_flags": [
-                      "--quiet"
+                      "--quiet",
+                      "--help"
                     ],
                     "interspersed_options_with_values": [
                       "--db"
