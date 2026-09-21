@@ -55,6 +55,29 @@ def test_changed_source_requires_a_fixture_bound_to_the_exact_json_document(
         prepare._validate_changed_source_fixture_pairs({source_path.relative_to(tmp_path).as_posix()}, [fixture_path])
 
 
+def test_changed_fixture_must_bind_to_the_current_canonical_source(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(prepare, "ROOT", tmp_path)
+    _, fixture_path = write_inputs(tmp_path)
+    fixture_path.write_text(json.dumps(fixture({"extension": {"extension_id": "command.demo"}, "changed": True})))
+    with pytest.raises(ValueError, match="Changed fixture needs to bind the exact canonical source"):
+        prepare._validate_changed_source_fixture_pairs({fixture_path.relative_to(tmp_path).as_posix()}, [fixture_path])
+
+
+def test_deleted_fixture_must_leave_a_binding_for_its_current_source(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(prepare, "ROOT", tmp_path)
+    _, fixture_path = write_inputs(tmp_path)
+    fixture_path.unlink()
+    monkeypatch.setattr(prepare, "_previous_fixture_source_ids", lambda *_: {"command.demo": source()})
+    with pytest.raises(ValueError, match="matching portable fixture"):
+        prepare._validate_changed_source_fixture_pairs(
+            {fixture_path.relative_to(tmp_path).as_posix()}, [], revision="base"
+        )
+
+
 def test_prepare_rejects_source_or_fixture_paths_outside_the_repository(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

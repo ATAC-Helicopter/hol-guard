@@ -53,19 +53,20 @@ def _extension_id(source: dict[str, object], path: Path) -> str:
     return extension_id
 
 
-def _fixture_source_ids(fixture: dict[str, object], path: Path) -> dict[str, dict[str, object]]:
+def _fixture_source_ids(fixture: dict[str, object], path: Path | str) -> dict[str, dict[str, object]]:
+    label = path if isinstance(path, str) else _relative(path)
     build = fixture.get("build")
     sources = build.get("sources") if isinstance(build, dict) else None
     if fixture.get("schema") != "guard.command-extension-fixtures.v1" or not isinstance(sources, list):
-        raise ValueError(f"Fixture has no valid native build envelope: {_relative(path)}")
+        raise ValueError(f"Fixture has no valid native build envelope: {label}")
     result: dict[str, dict[str, object]] = {}
     for item in sources:
         if not isinstance(item, dict):
-            raise ValueError(f"Fixture has an invalid source envelope: {_relative(path)}")
+            raise ValueError(f"Fixture has an invalid source envelope: {label}")
         extension = item.get("extension")
         extension_id = extension.get("extension_id") if isinstance(extension, dict) else None
         if not isinstance(extension_id, str) or extension_id in result:
-            raise ValueError(f"Fixture source identities are invalid: {_relative(path)}")
+            raise ValueError(f"Fixture source identities are invalid: {label}")
         result[extension_id] = item
     return result
 
@@ -83,7 +84,7 @@ def _changed_paths(revision: str) -> set[str]:
             str(ROOT),
             "diff",
             "--name-only",
-            "--diff-filter=ACMR",
+            "--diff-filter=ACMRD",
             f"{revision}...HEAD",
             "--",
             "contributions/command-sources",
@@ -97,6 +98,24 @@ def _changed_paths(revision: str) -> set[str]:
     if completed.returncode:
         raise ValueError("Could not determine the changed declarative contribution inputs.")
     return {line for line in completed.stdout.splitlines() if line}
+
+
+def _previous_fixture_source_ids(revision: str, relative_path: str) -> dict[str, dict[str, object]]:
+    completed = subprocess.run(
+        ["git", "-C", str(ROOT), "show", f"{revision}:{relative_path}"],
+        capture_output=True,
+        timeout=30,
+        check=False,
+    )
+    if completed.returncode or len(completed.stdout) > MAX_FIXTURE_BYTES:
+        raise ValueError(f"Could not inspect the deleted portable fixture: {relative_path}")
+    try:
+        fixture = json.loads(completed.stdout)
+    except json.JSONDecodeError as error:
+        raise ValueError(f"Invalid JSON in {relative_path} at the comparison revision") from error
+    if not isinstance(fixture, dict):
+        raise ValueError(f"Expected an object in {relative_path} at the comparison revision")
+    return _fixture_source_ids(fixture, relative_path)
 
 
 def _compiler(path: Path | None) -> Path:
@@ -156,14 +175,41 @@ def _validate_fixture(compiler: Path, path: Path) -> str:
     return _relative(path)
 
 
-def _validate_changed_source_fixture_pairs(changed: set[str], fixture_paths: list[Path]) -> list[Path]:
-    source_paths = [ROOT / path for path in sorted(changed) if path.startswith(SOURCE_PREFIX)]
-    if not source_paths:
-        return fixture_paths
+def _validate_changed_source_fixture_pairs(
+    changed: set[str], fixture_paths: list[Path], *, revision: str | None = None
+) -> list[Path]:
     fixture_sources = {path: _fixture_source_ids(_load_object(path), path) for path in fixture_paths}
-    for path in source_paths:
+    affected_ids: set[str] = set()
+    for relative_path in sorted(changed):
+        if relative_path.startswith(SOURCE_PREFIX):
+            path = ROOT / relative_path
+            if not path.is_file():
+                continue
+            source = _load_object(path)
+            affected_ids.add(_extension_id(source, path))
+            continue
+        if not relative_path.startswith(FIXTURE_PREFIX) or not relative_path.endswith(".v1.json"):
+            continue
+        path = ROOT / relative_path
+        if path.is_file():
+            changed_fixture_sources = _fixture_source_ids(_load_object(path), path)
+            for extension_id, fixture_source in changed_fixture_sources.items():
+                source_path = ROOT / f"{SOURCE_PREFIX}{extension_id}.json"
+                if not source_path.is_file() or _load_object(source_path) != fixture_source:
+                    raise ValueError(f"Changed fixture needs to bind the exact canonical source: {relative_path}")
+            affected_ids.update(changed_fixture_sources)
+        elif revision is not None:
+            affected_ids.update(_previous_fixture_source_ids(revision, relative_path))
+    current_fixture_ids = {extension_id for items in fixture_sources.values() for extension_id in items}
+    for extension_id in sorted(affected_ids):
+        path = ROOT / f"{SOURCE_PREFIX}{extension_id}.json"
+        if not path.is_file():
+            if extension_id in current_fixture_ids:
+                raise ValueError(f"Portable fixture has no canonical source: {extension_id}")
+            continue
         source = _load_object(path)
-        extension_id = _extension_id(source, path)
+        if _extension_id(source, path) != extension_id:
+            raise ValueError(f"Source identity does not match its canonical filename: {_relative(path)}")
         if not any(items.get(extension_id) == source for items in fixture_sources.values()):
             raise ValueError(
                 f"Changed source needs a matching portable fixture with the same build source: {_relative(path)}"
@@ -195,7 +241,9 @@ def main(argv: list[str] | None = None) -> int:
                 raise ValueError("The portable fixture does not bind the exact source document.")
             fixture_paths = [args.fixture]
         if args.changed_from:
-            fixture_paths = _validate_changed_source_fixture_pairs(_changed_paths(args.changed_from), fixture_paths)
+            fixture_paths = _validate_changed_source_fixture_pairs(
+                _changed_paths(args.changed_from), fixture_paths, revision=args.changed_from
+            )
         validated = [_validate_fixture(compiler, path) for path in fixture_paths]
         projection = [
             sys.executable,

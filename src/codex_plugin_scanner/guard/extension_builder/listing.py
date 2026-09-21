@@ -94,6 +94,9 @@ def validate_listing(payload: object, *, expected_id: str | None = None) -> dict
     text_values = [row["tagline"], *cast(list[str], row["limitations"])]
     if schema_version == LISTING_SCHEMA_V2:
         text_values.append(row["summary"])
+        upstream = row["upstream"]
+        if upstream is not None:
+            text_values.append(cast(str, cast(dict[str, object], upstream)["name"]))
     for value in text_values:
         if (
             not isinstance(value, str)
@@ -117,7 +120,6 @@ def validate_listing(payload: object, *, expected_id: str | None = None) -> dict
             raise BuilderError("listing_references", "Original contribution references must be unique.")
         for item in references:
             _public_https(cast(str, item["url"]))
-        upstream = row["upstream"]
         if upstream is not None:
             _public_https(cast(str, cast(dict[str, object], upstream)["url"]))
     if len(canonical_json(row).encode("utf-8")) > MAX_LISTING_BYTES:

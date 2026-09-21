@@ -36,6 +36,8 @@ OUTPUT = OUTPUT_V1
 MAX_ENTRIES = 512
 MAX_SOURCE_BYTES = 1_048_576
 MAX_CATALOG_BYTES = 1_048_576
+MIN_SUMMARY_LENGTH = 20
+MAX_SUMMARY_LENGTH = 2_048
 
 
 def _sources(root: Path) -> dict[str, tuple[str, dict[str, object], str]]:
@@ -109,6 +111,23 @@ def _authoring_source(root: Path, extension_id: str, contribution: dict[str, obj
         "byteDigest": "sha256:" + hashlib.sha256(content).hexdigest(),
         "nativeDigest": digest,
     }
+
+
+def _summary_for(listing: dict[str, object], entry: dict[str, object]) -> str:
+    """Keep v2's required public summary valid when an older listing has none."""
+
+    summary = listing.get("summary")
+    if isinstance(summary, str):
+        return summary
+    description = entry["description"]
+    if (
+        isinstance(description, str)
+        and MIN_SUMMARY_LENGTH <= len(description) <= MAX_SUMMARY_LENGTH
+        and description == description.strip()
+        and not any(ord(character) < 32 or ord(character) == 127 for character in description)
+    ):
+        return description
+    return f"Reviewed Guard coverage for {entry['id']}."
 
 
 def export_directory(root: Path = ROOT) -> dict[str, object]:
@@ -193,7 +212,7 @@ def export_directory_v2(root: Path = ROOT) -> dict[str, object]:
         listing = listing_source[1] if listing_source else {}
         entry.update(
             {
-                "summary": listing.get("summary", entry["description"]),
+                "summary": _summary_for(listing, entry),
                 "contributors": listing.get("contributors", []),
                 "originalContributions": listing.get("originalContributions", []),
                 "upstream": listing.get("upstream", None),

@@ -3,10 +3,7 @@
   "$id": "https://hol.org/guard/contracts/extension-directory.v2.schema.json",
   "type": "object",
   "additionalProperties": false,
-  "required": [
-    "schemaVersion",
-    "entries"
-  ],
+  "required": ["schemaVersion", "entries"],
   "properties": {
     "schemaVersion": {
       "const": "guard.extension-directory.v2"
@@ -19,34 +16,11 @@
         "type": "object",
         "additionalProperties": false,
         "required": [
-          "id",
-          "runtimeExtensionId",
-          "kind",
-          "version",
-          "name",
-          "description",
-          "tagline",
-          "category",
-          "tags",
-          "limitations",
-          "documentationUrl",
-          "protectionModel",
-          "trustClass",
-          "claimPolicy",
-          "maintainerGithubIds",
-          "sourcePath",
-          "contributionDigest",
-          "executables",
-          "actionClasses",
-          "ruleCount",
-          "permissionCount",
-          "toolStates",
-          "summary",
-          "contributors",
-          "originalContributions",
-          "upstream",
-          "listing",
-          "authoringSource"
+          "id", "runtimeExtensionId", "kind", "version", "name", "description", "tagline", "category",
+          "tags", "limitations", "documentationUrl", "protectionModel", "trustClass", "claimPolicy",
+          "maintainerGithubIds", "sourcePath", "contributionDigest", "executables", "actionClasses", "ruleCount",
+          "permissionCount", "toolStates", "summary", "contributors", "originalContributions", "upstream",
+          "listing", "authoringSource"
         ],
         "properties": {
           "id": {
@@ -85,18 +59,7 @@
             "minLength": 1,
             "maxLength": 140
           },
-          "category": {
-            "enum": [
-              "core-safety",
-              "cloud-infrastructure",
-              "data-resilience",
-              "delivery-remote",
-              "managed-services",
-              "package-supply-chain",
-              "specialized-tools",
-              "other"
-            ]
-          },
+          "category": {"enum": ["core-safety", "cloud-infrastructure", "data-resilience", "delivery-remote", "managed-services", "package-supply-chain", "specialized-tools", "other"]},
           "tags": {
             "type": "array",
             "maxItems": 8,

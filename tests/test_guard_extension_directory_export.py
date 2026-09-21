@@ -140,6 +140,16 @@ def test_v2_listing_metadata_has_separate_credit_and_claim_authority(tmp_path: P
     assert row["listing"]["path"] == "contributions/extension-listings/command.blitcp.json"
 
 
+def test_v2_directory_supplies_a_valid_summary_for_a_short_legacy_description(tmp_path: Path) -> None:
+    root = copy_sources(tmp_path)
+    contribution = root / "contributions/extensions/command.blitcp.json"
+    payload = json.loads(contribution.read_text())
+    payload["description"] = "Short description"
+    contribution.write_text(json.dumps(payload))
+    row = next(item for item in exporter.export_directory_v2(root)["entries"] if item["id"] == "command.blitcp")
+    assert row["summary"] == "Reviewed Guard coverage for command.blitcp."
+
+
 def test_claim_readiness_report_matches_claim_policy_invariants() -> None:
     report = exporter.claim_readiness()
     assert report["schemaVersion"] == "guard.extension-claim-readiness.v1"

@@ -160,6 +160,14 @@ def test_v2_credit_is_not_accepted_claim_authority() -> None:
         validate_listing(row)
 
 
+@pytest.mark.parametrize("name", [" Builder Demo", "Builder\nDemo"])
+def test_v2_upstream_name_is_plain_text(name: str) -> None:
+    row = listing()
+    row["upstream"] = {"name": name, "url": "https://github.com/example/builder-demo"}
+    with pytest.raises(BuilderError):
+        validate_listing(row)
+
+
 def test_rejects_duplicate_keys_filename_mismatch_and_byte_limit(tmp_path: Path) -> None:
     path = tmp_path / "command.builder-demo.json"
     path.write_text('{"schemaVersion":"guard.extension-listing.v1","schemaVersion":"other"}')
