@@ -30,7 +30,7 @@ apply.
 
 ## Source-of-truth files
 
-For a command extension, keep these files together in the same change:
+For a command extension, contributors submit these files together in the same change:
 
 1. `contributions/command-sources/command.<name>.json` with schema
    `guard.command-extension-source.v1`. It owns metadata, stable extension,
@@ -44,13 +44,27 @@ For a command extension, keep these files together in the same change:
 3. The external entry for the extension ID in
    `contracts/extensions/trust-class-map.v1.json`.
 
-The compiler derives these projections; do not edit them as independent
-inputs:
+The compiler derives these projections. Contributors do not edit or include
+them as independent inputs:
 
 - `contributions/extensions/command.<name>.json` (`guard.extension-contribution.v2`),
   including its `nativeSource` path and digest;
 - `contracts/extensions/native-command-program.v1.json`;
 - `contracts/extensions/command-catalog.v1.json`.
+
+After source review, a maintainer runs the preparation command to validate the
+exact source/fixture binding and synchronize the derived files:
+
+```sh
+uv run --no-sync python scripts/prepare_extension_contribution.py \
+  --source contributions/command-sources/command.<name>.json \
+  --fixture tests/fixtures/command-source-<slug>.v1.json
+```
+
+This is the only supported route for checked-in projections. It runs native
+fixtures with `targetCommandsExecuted: 0`, rebuilds the complete catalog, and
+updates package resources and public directories deterministically. Use
+`--check` to verify an already prepared change.
 
 Source metadata cannot grant trust, activation, allow authority, or a custom
 native callback. MCP contributions remain under `contributions/mcp-servers/`
@@ -90,7 +104,8 @@ rust/target/debug/guard-command-source compile < source-build.json > source-comp
 `base: "packaged"` compiles an addition against the admitted baseline and
 labels the result `addition-only-not-release-catalog`. It cannot replace an
 existing extension. The full repository build omits that base and reads every
-canonical source and MCP source through the checked-in orchestrator:
+canonical source and MCP source through the checked-in orchestrator. It is the
+underlying maintainer preparation step, not a contributor requirement:
 
 ```sh
 uv run --no-sync python scripts/build_native_command_program.py

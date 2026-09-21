@@ -29,7 +29,10 @@ from codex_plugin_scanner.guard.runtime.mcp_server_contribution import (
 )
 
 ROOT = Path(__file__).resolve().parents[1]
-OUTPUT = ROOT / "docs/guard/extensions/catalog.v1.json"
+OUTPUT_V1 = ROOT / "docs/guard/extensions/catalog.v1.json"
+OUTPUT_V2 = ROOT / "docs/guard/extensions/catalog.v2.json"
+# Retained for existing callers that intentionally address the v1 artifact.
+OUTPUT = OUTPUT_V1
 MAX_ENTRIES = 512
 MAX_SOURCE_BYTES = 1_048_576
 MAX_CATALOG_BYTES = 1_048_576
@@ -59,19 +62,59 @@ def _sources(root: Path) -> dict[str, tuple[str, dict[str, object], str]]:
     return result
 
 
+def _listings(
+    root: Path, sources: dict[str, tuple[str, dict[str, object], str]]
+) -> dict[str, tuple[str, dict[str, object], str]]:
+    result: dict[str, tuple[str, dict[str, object], str]] = {}
+    parent = checked_path(root / "contributions/extension-listings")
+    if not parent.exists():
+        return result
+    paths = sorted(parent.glob("*.json"))
+    if len(paths) > MAX_ENTRIES:
+        raise ValueError("Listing count exceeds its budget")
+    for path in paths:
+        extension_id = path.stem
+        if extension_id not in sources:
+            raise ValueError("A listing must belong to an existing external native contribution")
+        content = read_bytes(path, limit=MAX_SOURCE_BYTES)
+        result[extension_id] = (
+            path.relative_to(root).as_posix(),
+            load_listing(path, expected_id=extension_id),
+            "sha256:" + hashlib.sha256(content).hexdigest(),
+        )
+    return result
+
+
+def _authoring_source(root: Path, extension_id: str, contribution: dict[str, object]) -> dict[str, object]:
+    native = contribution.get("nativeSource")
+    if not isinstance(native, dict):
+        raise ValueError("A command directory entry must have generated native source evidence")
+    path = native.get("path")
+    digest = native.get("digest")
+    schema = native.get("schemaVersion")
+    expected_path = f"contributions/command-sources/{extension_id}.json"
+    if (
+        schema != "guard.command-extension-source.v1"
+        or path != expected_path
+        or not isinstance(digest, str)
+        or len(digest) != 64
+        or any(character not in "0123456789abcdef" for character in digest)
+    ):
+        raise ValueError("Generated native source evidence is invalid")
+    source = checked_path(root / expected_path)
+    content = read_bytes(source, limit=MAX_SOURCE_BYTES)
+    return {
+        "schemaVersion": schema,
+        "path": expected_path,
+        "byteDigest": "sha256:" + hashlib.sha256(content).hexdigest(),
+        "nativeDigest": digest,
+    }
+
+
 def export_directory(root: Path = ROOT) -> dict[str, object]:
     sources = _sources(root)
-    listings: dict[str, dict[str, object]] = {}
-    parent = checked_path(root / "contributions/extension-listings")
-    if parent.exists():
-        paths = sorted(parent.glob("*.json"))
-        if len(paths) > MAX_ENTRIES:
-            raise ValueError("Listing count exceeds its budget")
-        for path in paths:
-            extension_id = path.stem
-            if extension_id not in sources:
-                raise ValueError("A listing must belong to an existing external native contribution")
-            listings[extension_id] = load_listing(path, expected_id=extension_id)
+    listing_sources = _listings(root, sources)
+    listings = {extension_id: item[1] for extension_id, item in listing_sources.items()}
     mcp_ids = {catalog_id_for_mcp_id(key): key for key in sources if key.startswith("mcp.")}
     entries: list[dict[str, object]] = []
     seen: set[str] = set()
@@ -135,8 +178,51 @@ def export_directory(root: Path = ROOT) -> dict[str, object]:
     }
 
 
+def export_directory_v2(root: Path = ROOT) -> dict[str, object]:
+    """Project v2 public metadata without changing the v1 claim source binding."""
+
+    v1 = export_directory(root)
+    sources = _sources(root)
+    listings = _listings(root, sources)
+    entries: list[dict[str, object]] = []
+    for v1_entry in v1["entries"]:
+        entry = dict(v1_entry)
+        extension_id = str(entry["id"])
+        source = sources.get(extension_id)
+        listing_source = listings.get(extension_id)
+        listing = listing_source[1] if listing_source else {}
+        entry.update(
+            {
+                "summary": listing.get("summary", entry["description"]),
+                "contributors": listing.get("contributors", []),
+                "originalContributions": listing.get("originalContributions", []),
+                "upstream": listing.get("upstream", None),
+                "listing": ({"path": listing_source[0], "digest": listing_source[2]} if listing_source else None),
+                "authoringSource": (
+                    _authoring_source(root, extension_id, source[1])
+                    if entry["kind"] == "command" and source is not None
+                    else None
+                ),
+            }
+        )
+        if entry["kind"] == "command" and entry["authoringSource"] is None:
+            raise ValueError("A command directory entry is missing native authoring evidence")
+        entries.append(entry)
+    return {
+        "schemaVersion": "guard.extension-directory.v2",
+        "entries": entries,
+    }
+
+
 def render_directory(root: Path = ROOT) -> str:
     rendered = json.dumps(export_directory(root), ensure_ascii=True, sort_keys=True, separators=(",", ":")) + "\n"
+    if len(rendered.encode("utf-8")) > MAX_CATALOG_BYTES:
+        raise ValueError("Public directory exceeds its byte budget")
+    return rendered
+
+
+def render_directory_v2(root: Path = ROOT) -> str:
+    rendered = json.dumps(export_directory_v2(root), ensure_ascii=True, sort_keys=True, separators=(",", ":")) + "\n"
     if len(rendered.encode("utf-8")) > MAX_CATALOG_BYTES:
         raise ValueError("Public directory exceeds its byte budget")
     return rendered
@@ -218,12 +304,16 @@ def main(argv: list[str] | None = None) -> int:
         if args.readiness:
             print(json.dumps(claim_readiness(), ensure_ascii=True, sort_keys=True, separators=(",", ":")))
             return 0
-        rendered = render_directory()
+        rendered = {OUTPUT_V1: render_directory(), OUTPUT_V2: render_directory_v2()}
         if args.check:
-            if read_bytes(OUTPUT, limit=MAX_CATALOG_BYTES) != rendered.encode("utf-8"):
+            if any(
+                read_bytes(path, limit=MAX_CATALOG_BYTES) != content.encode("utf-8")
+                for path, content in rendered.items()
+            ):
                 parser.error("Extension catalog is stale; run python scripts/export_extension_directory.py")
         else:
-            write_catalog(OUTPUT, rendered)
+            for path, content in rendered.items():
+                write_catalog(path, content)
     except (BuilderError, OSError, ValueError) as error:
         parser.error(str(error))
     return 0

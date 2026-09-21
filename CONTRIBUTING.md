@@ -74,11 +74,12 @@ python -m build
 
 HOL Guard 3 command safety Extensions have additional security, compatibility, privacy, and test requirements.
 Browse the [Extension directory](docs/guard/extensions/README.md), then follow the
-[Extension contribution guide](docs/guard/extensions/contributing.md) before proposing or implementing coverage.
+[declarative extension contribution guide](docs/guard/extension-contributions.md) before proposing or implementing coverage.
 
 Open the dedicated Extension proposal form for a new capability boundary or a material authority change. Focused
-coverage expansions and false-positive fixes should still include destructive and safe-counterpart regression cases
-and keep the generated directory synchronized with the canonical runtime registry.
+coverage expansions and false-positive fixes should still include destructive and safe-counterpart regression cases.
+For declarative command sources, submit the source, its portable fixture, and the reviewed trust-map entry; a maintainer
+uses the documented preparation command to regenerate checked-in catalog projections.
 
 ## Contribution Expectations
 
