@@ -30,10 +30,22 @@ maintainer checks across supported AI plugin ecosystems.
 
 Command source files under `contributions/command-sources/` own extension metadata, permissions,
 rules, and typed matcher trees. Rust validates and compiles them into descriptors, the catalog,
-and the native program. Contributors submit the source, its portable fixture, and the reviewed
-trust-map entry; a maintainer prepares the deterministic projections after review. Existing Python
-detector modules are retained for migration or reference coverage; do not copy their registration
-pattern to add an extension.
+and the native program. Use the Extension Builder to write the source, portable fixture, reviewed
+external trust-map entry, and deterministic projections together; do not hand-edit generated
+artifacts. Existing Python detector modules are retained for migration or reference coverage; do
+not copy their registration pattern to add an extension.
+
+## Fast path for command extensions
+
+1. Generate and review an offline Builder kit, then preview and apply it with
+   `hol-guard extensions apply ... --repo .`.
+2. Run `scripts/prepare_extension_contribution.py` for the source and fixture, then verify the
+   complete handoff with `hol-guard extensions handoff --repo . --source ... --fixture ...`.
+3. Open a PR using the **Command extension** template. Ready PRs receive Gitar's managed label,
+   which enables automatic repair for mechanical schema, binding, and generated-projection issues.
+
+Gitar does not choose command semantics, trust, claim authority, or safe variants. Contributors
+can request analysis without changes at any time with `gitar auto-apply:off`.
 
 ## Development setup
 
@@ -134,7 +146,8 @@ checks authoring outside the checkout. Include the relevant CI results in the PR
    and agree on the capability boundary and stable IDs.
 3. Make one coherent change, with native behavior fixtures and generated outputs when applicable.
 4. Run the relevant validation and inspect the complete diff, including generated files.
-5. Open a PR describing the problem, resulting behavior, exact validation commands, and any
+5. For a command extension, run `hol-guard extensions handoff` and use the **Command extension**
+   PR template. Describe the problem, resulting behavior, exact validation commands, and any
    remaining limitations. Wait for the applicable CI checks and maintainer review.
 
 Community extensions are reviewed as external contributions and remain off until enabled by a
