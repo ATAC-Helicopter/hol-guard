@@ -1,0 +1,308 @@
+{
+  "schema": "guard.command-extension-fixtures.v1",
+  "cases": [
+    {
+      "id": "inactive-prune",
+      "command": "vaultsync prune Demo --keep-last 5",
+      "enabled_extensions": [],
+      "disabled_permissions": [],
+      "expected_action": "review",
+      "rule_id": "command.vaultsync.prune",
+      "expected_effective_segments": []
+    },
+    {
+      "id": "prune-review",
+      "command": "vaultsync prune Demo --keep-last 5",
+      "enabled_extensions": [
+        "command.vaultsync"
+      ],
+      "disabled_permissions": [],
+      "expected_action": "review",
+      "rule_id": "command.vaultsync.prune",
+      "expected_effective_segments": [
+        0
+      ]
+    },
+    {
+      "id": "prune-before-review",
+      "command": "vaultsync prune Demo --before 2026-09-01 --json",
+      "enabled_extensions": [
+        "command.vaultsync"
+      ],
+      "disabled_permissions": [],
+      "expected_action": "review",
+      "rule_id": "command.vaultsync.prune",
+      "expected_effective_segments": [
+        0
+      ]
+    },
+    {
+      "id": "prune-dry-run-safe",
+      "command": "vaultsync prune Demo --keep-last 5 --dry-run",
+      "enabled_extensions": [
+        "command.vaultsync"
+      ],
+      "disabled_permissions": [],
+      "expected_action": "review",
+      "rule_id": "command.vaultsync.prune",
+      "expected_effective_segments": []
+    },
+    {
+      "id": "prune-help-safe",
+      "command": "vaultsync prune --help",
+      "enabled_extensions": [
+        "command.vaultsync"
+      ],
+      "disabled_permissions": [],
+      "expected_action": "review",
+      "rule_id": "command.vaultsync.prune",
+      "expected_effective_segments": []
+    },
+    {
+      "id": "restore-review",
+      "command": "vaultsync restore Demo ./Recovered",
+      "enabled_extensions": [
+        "command.vaultsync"
+      ],
+      "disabled_permissions": [],
+      "expected_action": "review",
+      "rule_id": "command.vaultsync.restore",
+      "expected_effective_segments": [
+        0
+      ]
+    },
+    {
+      "id": "restore-clean-review",
+      "command": "vaultsync restore Demo ./Recovered --clean --json",
+      "enabled_extensions": [
+        "command.vaultsync"
+      ],
+      "disabled_permissions": [],
+      "expected_action": "review",
+      "rule_id": "command.vaultsync.restore",
+      "expected_effective_segments": [
+        0
+      ]
+    },
+    {
+      "id": "restore-dry-run-safe",
+      "command": "vaultsync restore Demo ./Recovered --snapshot 42 --dry-run",
+      "enabled_extensions": [
+        "command.vaultsync"
+      ],
+      "disabled_permissions": [],
+      "expected_action": "review",
+      "rule_id": "command.vaultsync.restore",
+      "expected_effective_segments": []
+    },
+    {
+      "id": "restore-help-safe",
+      "command": "vaultsync restore --help",
+      "enabled_extensions": [
+        "command.vaultsync"
+      ],
+      "disabled_permissions": [],
+      "expected_action": "review",
+      "rule_id": "command.vaultsync.restore",
+      "expected_effective_segments": []
+    },
+    {
+      "id": "remove-project-review",
+      "command": "vaultsync remove-project Demo",
+      "enabled_extensions": [
+        "command.vaultsync"
+      ],
+      "disabled_permissions": [],
+      "expected_action": "review",
+      "rule_id": "command.vaultsync.remove-project",
+      "expected_effective_segments": [
+        0
+      ]
+    },
+    {
+      "id": "remove-project-yes-still-review",
+      "command": "vaultsync remove-project Demo --yes",
+      "enabled_extensions": [
+        "command.vaultsync"
+      ],
+      "disabled_permissions": [],
+      "expected_action": "review",
+      "rule_id": "command.vaultsync.remove-project",
+      "expected_effective_segments": [
+        0
+      ]
+    },
+    {
+      "id": "remove-project-quiet-still-review",
+      "command": "vaultsync remove-project Demo --quiet",
+      "enabled_extensions": [
+        "command.vaultsync"
+      ],
+      "disabled_permissions": [],
+      "expected_action": "review",
+      "rule_id": "command.vaultsync.remove-project",
+      "expected_effective_segments": [
+        0
+      ]
+    },
+    {
+      "id": "remove-project-help-safe",
+      "command": "vaultsync remove-project --help",
+      "enabled_extensions": [
+        "command.vaultsync"
+      ],
+      "disabled_permissions": [],
+      "expected_action": "review",
+      "rule_id": "command.vaultsync.remove-project",
+      "expected_effective_segments": []
+    },
+    {
+      "id": "set-path-review",
+      "command": "vaultsync set-path Demo \"/srv/projects/Demo Project\"",
+      "enabled_extensions": [
+        "command.vaultsync"
+      ],
+      "disabled_permissions": [],
+      "expected_action": "review",
+      "rule_id": "command.vaultsync.set-path",
+      "expected_effective_segments": [
+        0
+      ]
+    },
+    {
+      "id": "update-path-alias-review",
+      "command": "vaultsync update-path Demo /srv/projects/Demo",
+      "enabled_extensions": [
+        "command.vaultsync"
+      ],
+      "disabled_permissions": [],
+      "expected_action": "review",
+      "rule_id": "command.vaultsync.set-path",
+      "expected_effective_segments": [
+        0
+      ]
+    },
+    {
+      "id": "set-path-help-safe",
+      "command": "vaultsync set-path --help",
+      "enabled_extensions": [
+        "command.vaultsync"
+      ],
+      "disabled_permissions": [],
+      "expected_action": "review",
+      "rule_id": "command.vaultsync.set-path",
+      "expected_effective_segments": []
+    },
+    {
+      "id": "list-projects-safe-case",
+      "command": "vaultsync list-projects --json",
+      "enabled_extensions": [
+        "command.vaultsync"
+      ],
+      "disabled_permissions": [],
+      "expected_action": "review",
+      "rule_id": "command.vaultsync.prune",
+      "expected_effective_segments": []
+    },
+    {
+      "id": "history-safe-case",
+      "command": "vaultsync history Demo --json",
+      "enabled_extensions": [
+        "command.vaultsync"
+      ],
+      "disabled_permissions": [],
+      "expected_action": "review",
+      "rule_id": "command.vaultsync.prune",
+      "expected_effective_segments": []
+    },
+    {
+      "id": "diff-safe-case",
+      "command": "vaultsync diff Demo 10 9 --json",
+      "enabled_extensions": [
+        "command.vaultsync"
+      ],
+      "disabled_permissions": [],
+      "expected_action": "review",
+      "rule_id": "command.vaultsync.prune",
+      "expected_effective_segments": []
+    },
+    {
+      "id": "verify-safe-case",
+      "command": "vaultsync verify Demo ./Backup --full --json",
+      "enabled_extensions": [
+        "command.vaultsync"
+      ],
+      "disabled_permissions": [],
+      "expected_action": "review",
+      "rule_id": "command.vaultsync.prune",
+      "expected_effective_segments": []
+    },
+    {
+      "id": "compound-safe-then-destructive",
+      "command": "vaultsync list-projects; vaultsync prune Demo --keep-last 5",
+      "enabled_extensions": [
+        "command.vaultsync"
+      ],
+      "disabled_permissions": [],
+      "expected_action": "review",
+      "rule_id": "command.vaultsync.prune",
+      "expected_effective_segments": [
+        1
+      ]
+    },
+    {
+      "id": "compound-dry-run-then-restore",
+      "command": "vaultsync prune Demo --keep-last 5 --dry-run; vaultsync restore Demo ./Recovered",
+      "enabled_extensions": [
+        "command.vaultsync"
+      ],
+      "disabled_permissions": [],
+      "expected_action": "review",
+      "rule_id": "command.vaultsync.restore",
+      "expected_effective_segments": [
+        1
+      ]
+    },
+    {
+      "id": "disabled-prune-permission",
+      "command": "vaultsync prune Demo --keep-last 5",
+      "enabled_extensions": [
+        "command.vaultsync"
+      ],
+      "disabled_permissions": [
+        "command.vaultsync.permission.prune"
+      ],
+      "expected_action": "block",
+      "rule_id": "command.vaultsync.prune",
+      "expected_effective_segments": [
+        0
+      ]
+    },
+    {
+      "id": "exe-launcher-review",
+      "command": "vaultsync.exe remove-project Demo --yes",
+      "enabled_extensions": [
+        "command.vaultsync"
+      ],
+      "disabled_permissions": [],
+      "expected_action": "review",
+      "rule_id": "command.vaultsync.remove-project",
+      "expected_effective_segments": [
+        0
+      ]
+    },
+    {
+      "id": "cmd-launcher-review",
+      "command": "vaultsync.cmd set-path Demo C:\\\\Projects\\\\Demo",
+      "enabled_extensions": [
+        "command.vaultsync"
+      ],
+      "disabled_permissions": [],
+      "expected_action": "review",
+      "rule_id": "command.vaultsync.set-path",
+      "expected_effective_segments": [
+        0
+      ]
+    }
+  ]
+}
