@@ -19,7 +19,6 @@ from codex_plugin_scanner.guard.runtime import local_package_script_evidence as 
 from codex_plugin_scanner.guard.runtime.command_contained_routine_candidates import (
     contained_routine_candidate_operation,
 )
-from codex_plugin_scanner.guard.runtime.command_evaluation import evaluate_command
 from codex_plugin_scanner.guard.runtime.containment_contract import (
     ContainmentAttestation,
     ContainmentBackend,
@@ -41,6 +40,7 @@ from codex_plugin_scanner.guard.runtime.local_package_script_evidence import (
 from codex_plugin_scanner.guard.runtime.workspace_snapshot_inputs import complete_workspace_snapshot
 from tests.guard_command_corpus import iter_adversarial_corpus, iter_benign_corpus
 from tests.guard_command_corpus_oracle import iter_adversarial_oracle, iter_benign_oracle
+from tests.native_command_test_support import real_native_command_evaluation
 
 _INTEGRITY = "sha512-" + base64.b64encode(bytes(64)).decode("ascii")
 _OPERATIONS = {
@@ -161,7 +161,9 @@ def test_every_cdx_061_corpus_case_requires_owned_containment_proof(partition: i
         strict=True,
     ):
         assert case.case_id == oracle.case_id
-        evaluation = evaluate_command(case.command, cwd=Path("workspace"), home_dir=Path("home"))
+        evaluation = real_native_command_evaluation(
+            case.command, cwd=Path("workspace"), home_dir=Path("home")
+        ).evaluation
         operation = contained_routine_candidate_operation(evaluation.command)
         if oracle.owner != "CDX-061":
             assert operation is None
@@ -180,7 +182,9 @@ def test_every_cdx_061_corpus_case_requires_owned_containment_proof(partition: i
     ):
         assert case.case_id == oracle.case_id
         assert oracle.owner != "CDX-061"
-        evaluation = evaluate_command(case.command, cwd=Path("workspace"), home_dir=Path("home"))
+        evaluation = real_native_command_evaluation(
+            case.command, cwd=Path("workspace"), home_dir=Path("home")
+        ).evaluation
         assert contained_routine_candidate_operation(evaluation.command) is None
 
 
@@ -190,7 +194,9 @@ def test_cdx_061_corpus_owned_count_and_operations_remain_complete() -> None:
     for case, oracle in zip(iter_benign_corpus(), iter_benign_oracle(), strict=True):
         if oracle.owner != "CDX-061":
             continue
-        evaluation = evaluate_command(case.command, cwd=Path("workspace"), home_dir=Path("home"))
+        evaluation = real_native_command_evaluation(
+            case.command, cwd=Path("workspace"), home_dir=Path("home")
+        ).evaluation
         operation = contained_routine_candidate_operation(evaluation.command)
         count += 1
         assert operation is not None

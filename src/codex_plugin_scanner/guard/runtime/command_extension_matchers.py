@@ -3,10 +3,10 @@
 from __future__ import annotations
 
 from .command_path_set_matcher import ExecutablePathSetMatcher
-from .command_rules import AnyMatcher, CommandSafeVariant, ExecutableMatcher, VersionedPackageSubcommandMatcher
+from .command_rules import AnyMatcher, CommandSafeVariant, ExecutableMatcher
 
 _EMPTY_STRING_SET: frozenset[str] = frozenset()
-_EXECUTABLE_CHILDREN = (ExecutableMatcher, ExecutablePathSetMatcher, VersionedPackageSubcommandMatcher)
+_EXECUTABLE_CHILDREN = (ExecutableMatcher, ExecutablePathSetMatcher)
 
 
 def executable_names(name: str) -> frozenset[str]:
@@ -108,24 +108,9 @@ def with_required_flag(matcher: AnyMatcher, flag: str, *, inverse_flag: str | No
 
     if not all(isinstance(child, _EXECUTABLE_CHILDREN) for child in matcher.matchers):
         raise ValueError("Safe variants require executable matcher children")
-    cloned: list[ExecutableMatcher | ExecutablePathSetMatcher | VersionedPackageSubcommandMatcher] = []
+    cloned: list[ExecutableMatcher | ExecutablePathSetMatcher] = []
     for child in matcher.matchers:
-        if isinstance(child, VersionedPackageSubcommandMatcher):
-            if inverse_flag is not None:
-                raise ValueError("VersionedPackageSubcommandMatcher does not support inverse flags")
-            cloned.append(
-                VersionedPackageSubcommandMatcher(
-                    executables=child.executables,
-                    package=child.package,
-                    leading_subcommands=child.leading_subcommands,
-                    subcommands=child.subcommands,
-                    required_flags=child.required_flags | {flag},
-                    interspersed_options_with_values=child.interspersed_options_with_values,
-                    interspersed_flags=child.interspersed_flags,
-                )
-            )
-            continue
-        if not isinstance(child, (ExecutableMatcher, ExecutablePathSetMatcher)):
+        if not isinstance(child, _EXECUTABLE_CHILDREN):
             continue
         cloned.append(
             _clone_executable_child(
@@ -172,11 +157,11 @@ def safe_option_variant(
 
     if not allowed_values:
         raise ValueError("Safe option variants require at least one allowed value")
-    if not all(isinstance(child, (ExecutableMatcher, ExecutablePathSetMatcher)) for child in matcher.matchers):
-        raise ValueError("Safe option variants require executable matcher children")
+    if not all(isinstance(child, _EXECUTABLE_CHILDREN) for child in matcher.matchers):
+        raise ValueError("Safe variants require executable matcher children")
     cloned: list[ExecutableMatcher | ExecutablePathSetMatcher] = []
     for child in matcher.matchers:
-        if not isinstance(child, (ExecutableMatcher, ExecutablePathSetMatcher)):
+        if not isinstance(child, _EXECUTABLE_CHILDREN):
             continue
         cloned.append(
             _clone_executable_child(
