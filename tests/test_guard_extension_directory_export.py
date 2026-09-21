@@ -38,6 +38,32 @@ def test_export_is_deterministic_and_current() -> None:
     assert json.loads(v2)["schemaVersion"] == "guard.extension-directory.v2"
 
 
+def test_paired_directory_render_uses_one_validated_source_snapshot(monkeypatch: pytest.MonkeyPatch) -> None:
+    source_calls = 0
+    listing_calls = 0
+    original_sources = exporter._sources
+    original_listings = exporter._listings
+
+    def sources(root: Path) -> dict[str, tuple[str, dict[str, object], str]]:
+        nonlocal source_calls
+        source_calls += 1
+        return original_sources(root)
+
+    def listings(
+        root: Path, sources: dict[str, tuple[str, dict[str, object], str]]
+    ) -> dict[str, tuple[str, dict[str, object], str]]:
+        nonlocal listing_calls
+        listing_calls += 1
+        return original_listings(root, sources)
+
+    monkeypatch.setattr(exporter, "_sources", sources)
+    monkeypatch.setattr(exporter, "_listings", listings)
+    rendered = exporter.render_directories()
+    assert (source_calls, listing_calls) == (1, 1)
+    assert rendered[exporter.OUTPUT_V1] == (REPOSITORY / "docs/guard/extensions/catalog.v1.json").read_text()
+    assert rendered[exporter.OUTPUT_V2] == (REPOSITORY / "docs/guard/extensions/catalog.v2.json").read_text()
+
+
 def test_every_native_extension_appears_once_with_unchanged_authority() -> None:
     native = {row.extension_id: row for row in BUILT_IN_COMMAND_EXTENSION_REGISTRY.extensions}
     entries = exporter.export_directory()["entries"]
