@@ -64,9 +64,11 @@ def test_paired_directory_render_uses_one_validated_source_snapshot(monkeypatch:
     assert rendered[exporter.OUTPUT_V2] == (REPOSITORY / "docs/guard/extensions/catalog.v2.json").read_text()
 
 
-def test_command_source_bytes_use_lf_checkout_for_stable_public_digests() -> None:
+def test_public_directory_bytes_use_lf_checkout_for_stable_public_digests() -> None:
     attributes = (REPOSITORY / ".gitattributes").read_text()
     assert "/contributions/command-sources/*.json text eol=lf" in attributes
+    assert "/docs/guard/extensions/catalog.v1.json text eol=lf" in attributes
+    assert "/docs/guard/extensions/catalog.v2.json text eol=lf" in attributes
 
 
 def test_every_native_extension_appears_once_with_unchanged_authority() -> None:
