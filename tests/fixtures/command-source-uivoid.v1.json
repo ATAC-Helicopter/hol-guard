@@ -1,0 +1,614 @@
+{
+  "cases": [
+    {
+      "command": "uivoid create my-app --base-url https://api.example.com",
+      "disabled_permissions": [],
+      "enabled_extensions": [
+        "command.uivoid"
+      ],
+      "expected_action": "review",
+      "expected_effective_segments": [
+        0
+      ],
+      "id": "create-basic",
+      "rule_id": "command.uivoid.create"
+    },
+    {
+      "command": "uivoid create my-app --yes",
+      "disabled_permissions": [],
+      "enabled_extensions": [
+        "command.uivoid"
+      ],
+      "expected_action": "review",
+      "expected_effective_segments": [
+        0
+      ],
+      "id": "create-yes",
+      "rule_id": "command.uivoid.create"
+    },
+    {
+      "command": "uivoid create my-app --exclude-destructive",
+      "disabled_permissions": [],
+      "enabled_extensions": [
+        "command.uivoid"
+      ],
+      "expected_action": "review",
+      "expected_effective_segments": [
+        0
+      ],
+      "id": "create-exclude-destructive",
+      "rule_id": "command.uivoid.create"
+    },
+    {
+      "command": "uivoid credentials my-app --auth-key sk_test_123",
+      "disabled_permissions": [],
+      "enabled_extensions": [
+        "command.uivoid"
+      ],
+      "expected_action": "review",
+      "expected_effective_segments": [
+        0
+      ],
+      "id": "credentials-basic",
+      "rule_id": "command.uivoid.credentials"
+    },
+    {
+      "command": "uivoid oauth-config my-app --login-mode oauth --issuer https://idp.example.com",
+      "disabled_permissions": [],
+      "enabled_extensions": [
+        "command.uivoid"
+      ],
+      "expected_action": "review",
+      "expected_effective_segments": [
+        0
+      ],
+      "id": "oauth-config-basic",
+      "rule_id": "command.uivoid.oauth-config"
+    },
+    {
+      "command": "uivoid login --token pat_abc123",
+      "disabled_permissions": [],
+      "enabled_extensions": [
+        "command.uivoid"
+      ],
+      "expected_action": "review",
+      "expected_effective_segments": [
+        0
+      ],
+      "id": "login-basic",
+      "rule_id": "command.uivoid.login"
+    },
+    {
+      "command": "uivoid login",
+      "disabled_permissions": [],
+      "enabled_extensions": [
+        "command.uivoid"
+      ],
+      "expected_action": "review",
+      "expected_effective_segments": [
+        0
+      ],
+      "id": "login-bare",
+      "rule_id": "command.uivoid.login"
+    },
+    {
+      "command": "uivoid skill --install",
+      "disabled_permissions": [],
+      "enabled_extensions": [
+        "command.uivoid"
+      ],
+      "expected_action": "review",
+      "expected_effective_segments": [
+        0
+      ],
+      "id": "skill-install",
+      "rule_id": "command.uivoid.skill-install"
+    },
+    {
+      "command": "npx uivoid create my-app --yes",
+      "disabled_permissions": [],
+      "enabled_extensions": [
+        "command.uivoid"
+      ],
+      "expected_action": "review",
+      "expected_effective_segments": [
+        0
+      ],
+      "id": "npx-create",
+      "rule_id": "command.uivoid.create"
+    },
+    {
+      "command": "bunx uivoid create my-app --yes",
+      "disabled_permissions": [],
+      "enabled_extensions": [
+        "command.uivoid"
+      ],
+      "expected_action": "review",
+      "expected_effective_segments": [
+        0
+      ],
+      "id": "bunx-create",
+      "rule_id": "command.uivoid.create"
+    },
+    {
+      "command": "pnpm uivoid create my-app",
+      "disabled_permissions": [],
+      "enabled_extensions": [
+        "command.uivoid"
+      ],
+      "expected_action": "review",
+      "expected_effective_segments": [
+        0
+      ],
+      "id": "pnpm-create",
+      "rule_id": "command.uivoid.create"
+    },
+    {
+      "command": "yarn uivoid create my-app",
+      "disabled_permissions": [],
+      "enabled_extensions": [
+        "command.uivoid"
+      ],
+      "expected_action": "review",
+      "expected_effective_segments": [
+        0
+      ],
+      "id": "yarn-create",
+      "rule_id": "command.uivoid.create"
+    },
+    {
+      "command": "npm exec uivoid create my-app",
+      "disabled_permissions": [],
+      "enabled_extensions": [
+        "command.uivoid"
+      ],
+      "expected_action": "review",
+      "expected_effective_segments": [
+        0
+      ],
+      "id": "npm-exec-create",
+      "rule_id": "command.uivoid.create"
+    },
+    {
+      "command": "pnpm exec uivoid create my-app",
+      "disabled_permissions": [],
+      "enabled_extensions": [
+        "command.uivoid"
+      ],
+      "expected_action": "review",
+      "expected_effective_segments": [
+        0
+      ],
+      "id": "pnpm-exec-create",
+      "rule_id": "command.uivoid.create"
+    },
+    {
+      "command": "pnpm dlx uivoid create my-app",
+      "disabled_permissions": [],
+      "enabled_extensions": [
+        "command.uivoid"
+      ],
+      "expected_action": "review",
+      "expected_effective_segments": [
+        0
+      ],
+      "id": "pnpm-dlx-create",
+      "rule_id": "command.uivoid.create"
+    },
+    {
+      "command": "yarn dlx uivoid create my-app",
+      "disabled_permissions": [],
+      "enabled_extensions": [
+        "command.uivoid"
+      ],
+      "expected_action": "review",
+      "expected_effective_segments": [
+        0
+      ],
+      "id": "yarn-dlx-create",
+      "rule_id": "command.uivoid.create"
+    },
+    {
+      "command": "npx --yes uivoid create my-app",
+      "disabled_permissions": [],
+      "enabled_extensions": [
+        "command.uivoid"
+      ],
+      "expected_action": "review",
+      "expected_effective_segments": [
+        0
+      ],
+      "id": "npx-leading-yes",
+      "rule_id": "command.uivoid.create"
+    },
+    {
+      "command": "npx -y uivoid create my-app",
+      "disabled_permissions": [],
+      "enabled_extensions": [
+        "command.uivoid"
+      ],
+      "expected_action": "review",
+      "expected_effective_segments": [
+        0
+      ],
+      "id": "npx-leading-y",
+      "rule_id": "command.uivoid.create"
+    },
+    {
+      "command": "pnpm --silent uivoid create my-app",
+      "disabled_permissions": [],
+      "enabled_extensions": [
+        "command.uivoid"
+      ],
+      "expected_action": "review",
+      "expected_effective_segments": [
+        0
+      ],
+      "id": "pnpm-leading-silent",
+      "rule_id": "command.uivoid.create"
+    },
+    {
+      "command": "npm exec --yes uivoid create my-app",
+      "disabled_permissions": [],
+      "enabled_extensions": [
+        "command.uivoid"
+      ],
+      "expected_action": "review",
+      "expected_effective_segments": [
+        0
+      ],
+      "id": "npm-exec-leading-yes",
+      "rule_id": "command.uivoid.create"
+    },
+    {
+      "command": "npx -- uivoid create my-app",
+      "disabled_permissions": [],
+      "enabled_extensions": [
+        "command.uivoid"
+      ],
+      "expected_action": "review",
+      "expected_effective_segments": [
+        0
+      ],
+      "id": "npx-dashdash",
+      "rule_id": "command.uivoid.create"
+    },
+    {
+      "command": "npm exec -- uivoid create my-app",
+      "disabled_permissions": [],
+      "enabled_extensions": [
+        "command.uivoid"
+      ],
+      "expected_action": "review",
+      "expected_effective_segments": [
+        0
+      ],
+      "id": "npm-exec-dashdash",
+      "rule_id": "command.uivoid.create"
+    },
+    {
+      "command": "npx uivoid@latest create my-app",
+      "disabled_permissions": [],
+      "enabled_extensions": [
+        "command.uivoid"
+      ],
+      "expected_action": "review",
+      "expected_effective_segments": [
+        0
+      ],
+      "id": "npx-versioned-latest",
+      "rule_id": "command.uivoid.create"
+    },
+    {
+      "command": "npx uivoid@1.2.3 create my-app",
+      "disabled_permissions": [],
+      "enabled_extensions": [
+        "command.uivoid"
+      ],
+      "expected_action": "review",
+      "expected_effective_segments": [
+        0
+      ],
+      "id": "npx-versioned-semver",
+      "rule_id": "command.uivoid.create"
+    },
+    {
+      "command": "bunx uivoid@latest create my-app",
+      "disabled_permissions": [],
+      "enabled_extensions": [
+        "command.uivoid"
+      ],
+      "expected_action": "review",
+      "expected_effective_segments": [
+        0
+      ],
+      "id": "bunx-versioned",
+      "rule_id": "command.uivoid.create"
+    },
+    {
+      "command": "npm exec uivoid@1.2.3 create my-app",
+      "disabled_permissions": [],
+      "enabled_extensions": [
+        "command.uivoid"
+      ],
+      "expected_action": "review",
+      "expected_effective_segments": [
+        0
+      ],
+      "id": "npm-exec-versioned",
+      "rule_id": "command.uivoid.create"
+    },
+    {
+      "command": "pnpm exec uivoid@1.2.3 create my-app",
+      "disabled_permissions": [],
+      "enabled_extensions": [
+        "command.uivoid"
+      ],
+      "expected_action": "review",
+      "expected_effective_segments": [
+        0
+      ],
+      "id": "pnpm-exec-versioned",
+      "rule_id": "command.uivoid.create"
+    },
+    {
+      "command": "pnpm dlx uivoid@latest create my-app",
+      "disabled_permissions": [],
+      "enabled_extensions": [
+        "command.uivoid"
+      ],
+      "expected_action": "review",
+      "expected_effective_segments": [
+        0
+      ],
+      "id": "pnpm-dlx-versioned",
+      "rule_id": "command.uivoid.create"
+    },
+    {
+      "command": "yarn dlx uivoid@latest create my-app",
+      "disabled_permissions": [],
+      "enabled_extensions": [
+        "command.uivoid"
+      ],
+      "expected_action": "review",
+      "expected_effective_segments": [
+        0
+      ],
+      "id": "yarn-dlx-versioned",
+      "rule_id": "command.uivoid.create"
+    },
+    {
+      "command": "npx --yes uivoid@latest create my-app",
+      "disabled_permissions": [],
+      "enabled_extensions": [
+        "command.uivoid"
+      ],
+      "expected_action": "review",
+      "expected_effective_segments": [
+        0
+      ],
+      "id": "npx-versioned-leading-yes",
+      "rule_id": "command.uivoid.create"
+    },
+    {
+      "command": "npx uivoid@latest login --token pat_abc123",
+      "disabled_permissions": [],
+      "enabled_extensions": [
+        "command.uivoid"
+      ],
+      "expected_action": "review",
+      "expected_effective_segments": [
+        0
+      ],
+      "id": "npx-versioned-login",
+      "rule_id": "command.uivoid.login"
+    },
+    {
+      "command": "npx uivoid@latest skill --install",
+      "disabled_permissions": [],
+      "enabled_extensions": [
+        "command.uivoid"
+      ],
+      "expected_action": "review",
+      "expected_effective_segments": [
+        0
+      ],
+      "id": "npx-versioned-skill",
+      "rule_id": "command.uivoid.skill-install"
+    },
+    {
+      "command": "NPX UIVOID@LATEST CREATE MY-APP",
+      "disabled_permissions": [],
+      "enabled_extensions": [
+        "command.uivoid"
+      ],
+      "expected_action": "review",
+      "expected_effective_segments": [
+        0
+      ],
+      "id": "npx-versioned-uppercase",
+      "rule_id": "command.uivoid.create"
+    },
+    {
+      "command": "npx uivoid@ create my-app",
+      "disabled_permissions": [],
+      "enabled_extensions": [
+        "command.uivoid"
+      ],
+      "expected_action": "review",
+      "expected_effective_segments": [
+        0
+      ],
+      "id": "npx-bare-at",
+      "rule_id": "command.uivoid.create"
+    },
+    {
+      "command": "npm exec uivoid@ create my-app",
+      "disabled_permissions": [],
+      "enabled_extensions": [
+        "command.uivoid"
+      ],
+      "expected_action": "review",
+      "expected_effective_segments": [
+        0
+      ],
+      "id": "npm-exec-bare-at",
+      "rule_id": "command.uivoid.create"
+    },
+    {
+      "command": "uivoid whoami",
+      "disabled_permissions": [],
+      "enabled_extensions": [
+        "command.uivoid"
+      ],
+      "expected_action": "review",
+      "expected_effective_segments": [],
+      "id": "whoami",
+      "rule_id": "command.uivoid.create"
+    },
+    {
+      "command": "uivoid whoami --json",
+      "disabled_permissions": [],
+      "enabled_extensions": [
+        "command.uivoid"
+      ],
+      "expected_action": "review",
+      "expected_effective_segments": [],
+      "id": "whoami-json",
+      "rule_id": "command.uivoid.create"
+    },
+    {
+      "command": "uivoid prompt",
+      "disabled_permissions": [],
+      "enabled_extensions": [
+        "command.uivoid"
+      ],
+      "expected_action": "review",
+      "expected_effective_segments": [],
+      "id": "prompt",
+      "rule_id": "command.uivoid.create"
+    },
+    {
+      "command": "uivoid logout",
+      "disabled_permissions": [],
+      "enabled_extensions": [
+        "command.uivoid"
+      ],
+      "expected_action": "review",
+      "expected_effective_segments": [],
+      "id": "logout",
+      "rule_id": "command.uivoid.create"
+    },
+    {
+      "command": "uivoid skill",
+      "disabled_permissions": [],
+      "enabled_extensions": [
+        "command.uivoid"
+      ],
+      "expected_action": "review",
+      "expected_effective_segments": [],
+      "id": "skill-no-install",
+      "rule_id": "command.uivoid.create"
+    },
+    {
+      "command": "uivoid create --help",
+      "disabled_permissions": [],
+      "enabled_extensions": [
+        "command.uivoid"
+      ],
+      "expected_action": "review",
+      "expected_effective_segments": [],
+      "id": "create-help",
+      "rule_id": "command.uivoid.create"
+    },
+    {
+      "command": "uivoid create -h",
+      "disabled_permissions": [],
+      "enabled_extensions": [
+        "command.uivoid"
+      ],
+      "expected_action": "review",
+      "expected_effective_segments": [],
+      "id": "create-help-short",
+      "rule_id": "command.uivoid.create"
+    },
+    {
+      "command": "uivoid skill --install --help",
+      "disabled_permissions": [],
+      "enabled_extensions": [
+        "command.uivoid"
+      ],
+      "expected_action": "review",
+      "expected_effective_segments": [],
+      "id": "skill-install-help",
+      "rule_id": "command.uivoid.create"
+    },
+    {
+      "command": "npx uivoid create --help",
+      "disabled_permissions": [],
+      "enabled_extensions": [
+        "command.uivoid"
+      ],
+      "expected_action": "review",
+      "expected_effective_segments": [],
+      "id": "npx-create-help",
+      "rule_id": "command.uivoid.create"
+    },
+    {
+      "command": "npx uivoidx@latest create my-app",
+      "disabled_permissions": [],
+      "enabled_extensions": [
+        "command.uivoid"
+      ],
+      "expected_action": "review",
+      "expected_effective_segments": [],
+      "id": "lookalike-suffix",
+      "rule_id": "command.uivoid.create"
+    },
+    {
+      "command": "npx @scope/uivoid@latest create my-app",
+      "disabled_permissions": [],
+      "enabled_extensions": [
+        "command.uivoid"
+      ],
+      "expected_action": "review",
+      "expected_effective_segments": [],
+      "id": "lookalike-scoped",
+      "rule_id": "command.uivoid.create"
+    },
+    {
+      "command": "npx not-uivoid create my-app",
+      "disabled_permissions": [],
+      "enabled_extensions": [
+        "command.uivoid"
+      ],
+      "expected_action": "review",
+      "expected_effective_segments": [],
+      "id": "lookalike-name",
+      "rule_id": "command.uivoid.create"
+    },
+    {
+      "command": "pnpm uivoid@latest create my-app",
+      "disabled_permissions": [],
+      "enabled_extensions": [
+        "command.uivoid"
+      ],
+      "expected_action": "review",
+      "expected_effective_segments": [],
+      "id": "pnpm-plain-versioned",
+      "rule_id": "command.uivoid.create"
+    },
+    {
+      "command": "yarn uivoid@latest create my-app",
+      "disabled_permissions": [],
+      "enabled_extensions": [
+        "command.uivoid"
+      ],
+      "expected_action": "review",
+      "expected_effective_segments": [],
+      "id": "yarn-plain-versioned",
+      "rule_id": "command.uivoid.create"
+    }
+  ],
+  "schema": "guard.command-extension-fixtures.v1"
+}
