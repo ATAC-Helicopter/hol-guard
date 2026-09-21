@@ -81,7 +81,7 @@ def validate_listing(payload: object, *, expected_id: str | None = None) -> dict
     """Validate bounded listing metadata without resolving links or performing a claim grant."""
 
     schema_version = payload.get("schemaVersion") if isinstance(payload, dict) else None
-    if schema_version not in {LISTING_SCHEMA_V1, LISTING_SCHEMA_V2}:
+    if not isinstance(schema_version, str) or schema_version not in {LISTING_SCHEMA_V1, LISTING_SCHEMA_V2}:
         raise BuilderError("listing_schema", "Listing uses an unsupported metadata schema version.")
     validator = Draft202012Validator(listing_schema(cast(str, schema_version)), format_checker=FormatChecker())
     try:

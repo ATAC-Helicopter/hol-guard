@@ -72,6 +72,7 @@ def test_template_has_no_inferred_claim_or_runtime_authority(kind: Literal["cli"
     "field,value",
     [
         ("activation", "default-on"),
+        ("schemaVersion", ["guard.extension-listing.v2"]),
         ("trustClass", "first-party"),
         ("detector", "evil.py"),
         ("policy", {}),
