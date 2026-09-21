@@ -92,10 +92,12 @@ def validate_listing(payload: object, *, expected_id: str | None = None) -> dict
     if expected_id is not None and row["extensionId"] != expected_id:
         raise BuilderError("listing_identity", "Listing identity must match its native contribution and filename.")
     text_values = [row["tagline"], *cast(list[str], row["limitations"])]
+    upstream: dict[str, object] | None = None
     if schema_version == LISTING_SCHEMA_V2:
         text_values.append(row["summary"])
-        upstream = row["upstream"]
-        if upstream is not None:
+        raw_upstream = row["upstream"]
+        if raw_upstream is not None:
+            upstream = cast(dict[str, object], raw_upstream)
             text_values.append(cast(str, cast(dict[str, object], upstream)["name"]))
     for value in text_values:
         if (
