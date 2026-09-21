@@ -20,11 +20,12 @@ class DirectoryPathTrustError(ValueError):
 def trusted_guard_directory_roots(guard_home: Path) -> tuple[Path, ...]:
     current_home = Path.home().resolve()
     guard_home_root = guard_home.expanduser().resolve().parent
-    if guard_home_root == current_home or os.fspath(guard_home_root).startswith(
+    roots = [current_home]
+    if guard_home_root != current_home and not os.fspath(guard_home_root).startswith(
         os.fspath(current_home).rstrip(os.sep) + os.sep
     ):
-        return (current_home,)
-    return current_home, guard_home_root
+        roots.append(guard_home_root)
+    return tuple(roots)
 
 
 def validate_guard_directory_path(

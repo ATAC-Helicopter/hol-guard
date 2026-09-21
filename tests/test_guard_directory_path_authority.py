@@ -7,8 +7,23 @@ from pathlib import Path
 
 import pytest
 
+from codex_plugin_scanner.guard import directory_path_authority
 from codex_plugin_scanner.guard.daemon import server as server_module
 from codex_plugin_scanner.path_support import resolve_path_within_allowed_roots
+
+
+def test_trusted_guard_directory_roots_omits_redundant_child_root(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    home = tmp_path / "home"
+    home.mkdir()
+    monkeypatch.setattr(directory_path_authority.Path, "home", classmethod(lambda cls: home))
+
+    assert directory_path_authority.trusted_guard_directory_roots(home / ".hol-guard" / "config.toml") == (home,)
+    assert directory_path_authority.trusted_guard_directory_roots(tmp_path / "external" / "config.toml") == (
+        home,
+        tmp_path / "external",
+    )
 
 
 @pytest.mark.parametrize("relative", [".", "workspace", "workspace/../workspace"])
