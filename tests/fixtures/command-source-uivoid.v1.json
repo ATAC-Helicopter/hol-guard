@@ -16699,6 +16699,1524 @@
       "expected_effective_segments": [],
       "id": "yarn-plain-versioned",
       "rule_id": "command.uivoid.create"
+    },
+    {
+      "command": "npx uivoid@latest create --help",
+      "disabled_permissions": [],
+      "enabled_extensions": [
+        "command.uivoid"
+      ],
+      "expected_action": "review",
+      "expected_effective_segments": [],
+      "id": "npx-create-help-flag",
+      "rule_id": "command.uivoid.create"
+    },
+    {
+      "command": "npx uivoid@latest create -- --help",
+      "disabled_permissions": [],
+      "enabled_extensions": [
+        "command.uivoid"
+      ],
+      "expected_action": "review",
+      "expected_effective_segments": [
+        0
+      ],
+      "id": "npx-create-help-operand",
+      "rule_id": "command.uivoid.create"
+    },
+    {
+      "command": "npx uivoid@latest create -h",
+      "disabled_permissions": [],
+      "enabled_extensions": [
+        "command.uivoid"
+      ],
+      "expected_action": "review",
+      "expected_effective_segments": [],
+      "id": "npx-create-h-flag",
+      "rule_id": "command.uivoid.create"
+    },
+    {
+      "command": "npx uivoid@latest create -- -h",
+      "disabled_permissions": [],
+      "enabled_extensions": [
+        "command.uivoid"
+      ],
+      "expected_action": "review",
+      "expected_effective_segments": [
+        0
+      ],
+      "id": "npx-create-h-operand",
+      "rule_id": "command.uivoid.create"
+    },
+    {
+      "command": "npx uivoid@latest credentials --help",
+      "disabled_permissions": [],
+      "enabled_extensions": [
+        "command.uivoid"
+      ],
+      "expected_action": "review",
+      "expected_effective_segments": [],
+      "id": "npx-credentials-help-flag",
+      "rule_id": "command.uivoid.credentials"
+    },
+    {
+      "command": "npx uivoid@latest credentials -- --help",
+      "disabled_permissions": [],
+      "enabled_extensions": [
+        "command.uivoid"
+      ],
+      "expected_action": "review",
+      "expected_effective_segments": [
+        0
+      ],
+      "id": "npx-credentials-help-operand",
+      "rule_id": "command.uivoid.credentials"
+    },
+    {
+      "command": "npx uivoid@latest credentials -h",
+      "disabled_permissions": [],
+      "enabled_extensions": [
+        "command.uivoid"
+      ],
+      "expected_action": "review",
+      "expected_effective_segments": [],
+      "id": "npx-credentials-h-flag",
+      "rule_id": "command.uivoid.credentials"
+    },
+    {
+      "command": "npx uivoid@latest credentials -- -h",
+      "disabled_permissions": [],
+      "enabled_extensions": [
+        "command.uivoid"
+      ],
+      "expected_action": "review",
+      "expected_effective_segments": [
+        0
+      ],
+      "id": "npx-credentials-h-operand",
+      "rule_id": "command.uivoid.credentials"
+    },
+    {
+      "command": "npx uivoid@latest oauth-config --help",
+      "disabled_permissions": [],
+      "enabled_extensions": [
+        "command.uivoid"
+      ],
+      "expected_action": "review",
+      "expected_effective_segments": [],
+      "id": "npx-oauth-config-help-flag",
+      "rule_id": "command.uivoid.oauth-config"
+    },
+    {
+      "command": "npx uivoid@latest oauth-config -- --help",
+      "disabled_permissions": [],
+      "enabled_extensions": [
+        "command.uivoid"
+      ],
+      "expected_action": "review",
+      "expected_effective_segments": [
+        0
+      ],
+      "id": "npx-oauth-config-help-operand",
+      "rule_id": "command.uivoid.oauth-config"
+    },
+    {
+      "command": "npx uivoid@latest oauth-config -h",
+      "disabled_permissions": [],
+      "enabled_extensions": [
+        "command.uivoid"
+      ],
+      "expected_action": "review",
+      "expected_effective_segments": [],
+      "id": "npx-oauth-config-h-flag",
+      "rule_id": "command.uivoid.oauth-config"
+    },
+    {
+      "command": "npx uivoid@latest oauth-config -- -h",
+      "disabled_permissions": [],
+      "enabled_extensions": [
+        "command.uivoid"
+      ],
+      "expected_action": "review",
+      "expected_effective_segments": [
+        0
+      ],
+      "id": "npx-oauth-config-h-operand",
+      "rule_id": "command.uivoid.oauth-config"
+    },
+    {
+      "command": "npx uivoid@latest login --help",
+      "disabled_permissions": [],
+      "enabled_extensions": [
+        "command.uivoid"
+      ],
+      "expected_action": "review",
+      "expected_effective_segments": [],
+      "id": "npx-login-help-flag",
+      "rule_id": "command.uivoid.login"
+    },
+    {
+      "command": "npx uivoid@latest login -- --help",
+      "disabled_permissions": [],
+      "enabled_extensions": [
+        "command.uivoid"
+      ],
+      "expected_action": "review",
+      "expected_effective_segments": [
+        0
+      ],
+      "id": "npx-login-help-operand",
+      "rule_id": "command.uivoid.login"
+    },
+    {
+      "command": "npx uivoid@latest login -h",
+      "disabled_permissions": [],
+      "enabled_extensions": [
+        "command.uivoid"
+      ],
+      "expected_action": "review",
+      "expected_effective_segments": [],
+      "id": "npx-login-h-flag",
+      "rule_id": "command.uivoid.login"
+    },
+    {
+      "command": "npx uivoid@latest login -- -h",
+      "disabled_permissions": [],
+      "enabled_extensions": [
+        "command.uivoid"
+      ],
+      "expected_action": "review",
+      "expected_effective_segments": [
+        0
+      ],
+      "id": "npx-login-h-operand",
+      "rule_id": "command.uivoid.login"
+    },
+    {
+      "command": "npx uivoid@latest skill --install --help",
+      "disabled_permissions": [],
+      "enabled_extensions": [
+        "command.uivoid"
+      ],
+      "expected_action": "review",
+      "expected_effective_segments": [],
+      "id": "npx-skill-install-help-flag",
+      "rule_id": "command.uivoid.skill-install"
+    },
+    {
+      "command": "npx uivoid@latest skill --install -- --help",
+      "disabled_permissions": [],
+      "enabled_extensions": [
+        "command.uivoid"
+      ],
+      "expected_action": "review",
+      "expected_effective_segments": [
+        0
+      ],
+      "id": "npx-skill-install-help-operand",
+      "rule_id": "command.uivoid.skill-install"
+    },
+    {
+      "command": "npx uivoid@latest skill --install -h",
+      "disabled_permissions": [],
+      "enabled_extensions": [
+        "command.uivoid"
+      ],
+      "expected_action": "review",
+      "expected_effective_segments": [],
+      "id": "npx-skill-install-h-flag",
+      "rule_id": "command.uivoid.skill-install"
+    },
+    {
+      "command": "npx uivoid@latest skill --install -- -h",
+      "disabled_permissions": [],
+      "enabled_extensions": [
+        "command.uivoid"
+      ],
+      "expected_action": "review",
+      "expected_effective_segments": [
+        0
+      ],
+      "id": "npx-skill-install-h-operand",
+      "rule_id": "command.uivoid.skill-install"
+    },
+    {
+      "command": "npx -- uivoid@latest create -- --help",
+      "disabled_permissions": [],
+      "enabled_extensions": [
+        "command.uivoid"
+      ],
+      "expected_action": "review",
+      "expected_effective_segments": [
+        0
+      ],
+      "id": "npx-launcher-separator-and-help-operand",
+      "rule_id": "command.uivoid.create"
+    },
+    {
+      "command": "bunx uivoid@latest create --help",
+      "disabled_permissions": [],
+      "enabled_extensions": [
+        "command.uivoid"
+      ],
+      "expected_action": "review",
+      "expected_effective_segments": [],
+      "id": "bunx-create-help-flag",
+      "rule_id": "command.uivoid.create"
+    },
+    {
+      "command": "bunx uivoid@latest create -- --help",
+      "disabled_permissions": [],
+      "enabled_extensions": [
+        "command.uivoid"
+      ],
+      "expected_action": "review",
+      "expected_effective_segments": [
+        0
+      ],
+      "id": "bunx-create-help-operand",
+      "rule_id": "command.uivoid.create"
+    },
+    {
+      "command": "bunx uivoid@latest create -h",
+      "disabled_permissions": [],
+      "enabled_extensions": [
+        "command.uivoid"
+      ],
+      "expected_action": "review",
+      "expected_effective_segments": [],
+      "id": "bunx-create-h-flag",
+      "rule_id": "command.uivoid.create"
+    },
+    {
+      "command": "bunx uivoid@latest create -- -h",
+      "disabled_permissions": [],
+      "enabled_extensions": [
+        "command.uivoid"
+      ],
+      "expected_action": "review",
+      "expected_effective_segments": [
+        0
+      ],
+      "id": "bunx-create-h-operand",
+      "rule_id": "command.uivoid.create"
+    },
+    {
+      "command": "bunx uivoid@latest credentials --help",
+      "disabled_permissions": [],
+      "enabled_extensions": [
+        "command.uivoid"
+      ],
+      "expected_action": "review",
+      "expected_effective_segments": [],
+      "id": "bunx-credentials-help-flag",
+      "rule_id": "command.uivoid.credentials"
+    },
+    {
+      "command": "bunx uivoid@latest credentials -- --help",
+      "disabled_permissions": [],
+      "enabled_extensions": [
+        "command.uivoid"
+      ],
+      "expected_action": "review",
+      "expected_effective_segments": [
+        0
+      ],
+      "id": "bunx-credentials-help-operand",
+      "rule_id": "command.uivoid.credentials"
+    },
+    {
+      "command": "bunx uivoid@latest credentials -h",
+      "disabled_permissions": [],
+      "enabled_extensions": [
+        "command.uivoid"
+      ],
+      "expected_action": "review",
+      "expected_effective_segments": [],
+      "id": "bunx-credentials-h-flag",
+      "rule_id": "command.uivoid.credentials"
+    },
+    {
+      "command": "bunx uivoid@latest credentials -- -h",
+      "disabled_permissions": [],
+      "enabled_extensions": [
+        "command.uivoid"
+      ],
+      "expected_action": "review",
+      "expected_effective_segments": [
+        0
+      ],
+      "id": "bunx-credentials-h-operand",
+      "rule_id": "command.uivoid.credentials"
+    },
+    {
+      "command": "bunx uivoid@latest oauth-config --help",
+      "disabled_permissions": [],
+      "enabled_extensions": [
+        "command.uivoid"
+      ],
+      "expected_action": "review",
+      "expected_effective_segments": [],
+      "id": "bunx-oauth-config-help-flag",
+      "rule_id": "command.uivoid.oauth-config"
+    },
+    {
+      "command": "bunx uivoid@latest oauth-config -- --help",
+      "disabled_permissions": [],
+      "enabled_extensions": [
+        "command.uivoid"
+      ],
+      "expected_action": "review",
+      "expected_effective_segments": [
+        0
+      ],
+      "id": "bunx-oauth-config-help-operand",
+      "rule_id": "command.uivoid.oauth-config"
+    },
+    {
+      "command": "bunx uivoid@latest oauth-config -h",
+      "disabled_permissions": [],
+      "enabled_extensions": [
+        "command.uivoid"
+      ],
+      "expected_action": "review",
+      "expected_effective_segments": [],
+      "id": "bunx-oauth-config-h-flag",
+      "rule_id": "command.uivoid.oauth-config"
+    },
+    {
+      "command": "bunx uivoid@latest oauth-config -- -h",
+      "disabled_permissions": [],
+      "enabled_extensions": [
+        "command.uivoid"
+      ],
+      "expected_action": "review",
+      "expected_effective_segments": [
+        0
+      ],
+      "id": "bunx-oauth-config-h-operand",
+      "rule_id": "command.uivoid.oauth-config"
+    },
+    {
+      "command": "bunx uivoid@latest login --help",
+      "disabled_permissions": [],
+      "enabled_extensions": [
+        "command.uivoid"
+      ],
+      "expected_action": "review",
+      "expected_effective_segments": [],
+      "id": "bunx-login-help-flag",
+      "rule_id": "command.uivoid.login"
+    },
+    {
+      "command": "bunx uivoid@latest login -- --help",
+      "disabled_permissions": [],
+      "enabled_extensions": [
+        "command.uivoid"
+      ],
+      "expected_action": "review",
+      "expected_effective_segments": [
+        0
+      ],
+      "id": "bunx-login-help-operand",
+      "rule_id": "command.uivoid.login"
+    },
+    {
+      "command": "bunx uivoid@latest login -h",
+      "disabled_permissions": [],
+      "enabled_extensions": [
+        "command.uivoid"
+      ],
+      "expected_action": "review",
+      "expected_effective_segments": [],
+      "id": "bunx-login-h-flag",
+      "rule_id": "command.uivoid.login"
+    },
+    {
+      "command": "bunx uivoid@latest login -- -h",
+      "disabled_permissions": [],
+      "enabled_extensions": [
+        "command.uivoid"
+      ],
+      "expected_action": "review",
+      "expected_effective_segments": [
+        0
+      ],
+      "id": "bunx-login-h-operand",
+      "rule_id": "command.uivoid.login"
+    },
+    {
+      "command": "bunx uivoid@latest skill --install --help",
+      "disabled_permissions": [],
+      "enabled_extensions": [
+        "command.uivoid"
+      ],
+      "expected_action": "review",
+      "expected_effective_segments": [],
+      "id": "bunx-skill-install-help-flag",
+      "rule_id": "command.uivoid.skill-install"
+    },
+    {
+      "command": "bunx uivoid@latest skill --install -- --help",
+      "disabled_permissions": [],
+      "enabled_extensions": [
+        "command.uivoid"
+      ],
+      "expected_action": "review",
+      "expected_effective_segments": [
+        0
+      ],
+      "id": "bunx-skill-install-help-operand",
+      "rule_id": "command.uivoid.skill-install"
+    },
+    {
+      "command": "bunx uivoid@latest skill --install -h",
+      "disabled_permissions": [],
+      "enabled_extensions": [
+        "command.uivoid"
+      ],
+      "expected_action": "review",
+      "expected_effective_segments": [],
+      "id": "bunx-skill-install-h-flag",
+      "rule_id": "command.uivoid.skill-install"
+    },
+    {
+      "command": "bunx uivoid@latest skill --install -- -h",
+      "disabled_permissions": [],
+      "enabled_extensions": [
+        "command.uivoid"
+      ],
+      "expected_action": "review",
+      "expected_effective_segments": [
+        0
+      ],
+      "id": "bunx-skill-install-h-operand",
+      "rule_id": "command.uivoid.skill-install"
+    },
+    {
+      "command": "bunx -- uivoid@latest create -- --help",
+      "disabled_permissions": [],
+      "enabled_extensions": [
+        "command.uivoid"
+      ],
+      "expected_action": "review",
+      "expected_effective_segments": [
+        0
+      ],
+      "id": "bunx-launcher-separator-and-help-operand",
+      "rule_id": "command.uivoid.create"
+    },
+    {
+      "command": "npm exec uivoid@latest create --help",
+      "disabled_permissions": [],
+      "enabled_extensions": [
+        "command.uivoid"
+      ],
+      "expected_action": "review",
+      "expected_effective_segments": [],
+      "id": "npm-exec-create-help-flag",
+      "rule_id": "command.uivoid.create"
+    },
+    {
+      "command": "npm exec uivoid@latest create -- --help",
+      "disabled_permissions": [],
+      "enabled_extensions": [
+        "command.uivoid"
+      ],
+      "expected_action": "review",
+      "expected_effective_segments": [
+        0
+      ],
+      "id": "npm-exec-create-help-operand",
+      "rule_id": "command.uivoid.create"
+    },
+    {
+      "command": "npm exec uivoid@latest create -h",
+      "disabled_permissions": [],
+      "enabled_extensions": [
+        "command.uivoid"
+      ],
+      "expected_action": "review",
+      "expected_effective_segments": [],
+      "id": "npm-exec-create-h-flag",
+      "rule_id": "command.uivoid.create"
+    },
+    {
+      "command": "npm exec uivoid@latest create -- -h",
+      "disabled_permissions": [],
+      "enabled_extensions": [
+        "command.uivoid"
+      ],
+      "expected_action": "review",
+      "expected_effective_segments": [
+        0
+      ],
+      "id": "npm-exec-create-h-operand",
+      "rule_id": "command.uivoid.create"
+    },
+    {
+      "command": "npm exec uivoid@latest credentials --help",
+      "disabled_permissions": [],
+      "enabled_extensions": [
+        "command.uivoid"
+      ],
+      "expected_action": "review",
+      "expected_effective_segments": [],
+      "id": "npm-exec-credentials-help-flag",
+      "rule_id": "command.uivoid.credentials"
+    },
+    {
+      "command": "npm exec uivoid@latest credentials -- --help",
+      "disabled_permissions": [],
+      "enabled_extensions": [
+        "command.uivoid"
+      ],
+      "expected_action": "review",
+      "expected_effective_segments": [
+        0
+      ],
+      "id": "npm-exec-credentials-help-operand",
+      "rule_id": "command.uivoid.credentials"
+    },
+    {
+      "command": "npm exec uivoid@latest credentials -h",
+      "disabled_permissions": [],
+      "enabled_extensions": [
+        "command.uivoid"
+      ],
+      "expected_action": "review",
+      "expected_effective_segments": [],
+      "id": "npm-exec-credentials-h-flag",
+      "rule_id": "command.uivoid.credentials"
+    },
+    {
+      "command": "npm exec uivoid@latest credentials -- -h",
+      "disabled_permissions": [],
+      "enabled_extensions": [
+        "command.uivoid"
+      ],
+      "expected_action": "review",
+      "expected_effective_segments": [
+        0
+      ],
+      "id": "npm-exec-credentials-h-operand",
+      "rule_id": "command.uivoid.credentials"
+    },
+    {
+      "command": "npm exec uivoid@latest oauth-config --help",
+      "disabled_permissions": [],
+      "enabled_extensions": [
+        "command.uivoid"
+      ],
+      "expected_action": "review",
+      "expected_effective_segments": [],
+      "id": "npm-exec-oauth-config-help-flag",
+      "rule_id": "command.uivoid.oauth-config"
+    },
+    {
+      "command": "npm exec uivoid@latest oauth-config -- --help",
+      "disabled_permissions": [],
+      "enabled_extensions": [
+        "command.uivoid"
+      ],
+      "expected_action": "review",
+      "expected_effective_segments": [
+        0
+      ],
+      "id": "npm-exec-oauth-config-help-operand",
+      "rule_id": "command.uivoid.oauth-config"
+    },
+    {
+      "command": "npm exec uivoid@latest oauth-config -h",
+      "disabled_permissions": [],
+      "enabled_extensions": [
+        "command.uivoid"
+      ],
+      "expected_action": "review",
+      "expected_effective_segments": [],
+      "id": "npm-exec-oauth-config-h-flag",
+      "rule_id": "command.uivoid.oauth-config"
+    },
+    {
+      "command": "npm exec uivoid@latest oauth-config -- -h",
+      "disabled_permissions": [],
+      "enabled_extensions": [
+        "command.uivoid"
+      ],
+      "expected_action": "review",
+      "expected_effective_segments": [
+        0
+      ],
+      "id": "npm-exec-oauth-config-h-operand",
+      "rule_id": "command.uivoid.oauth-config"
+    },
+    {
+      "command": "npm exec uivoid@latest login --help",
+      "disabled_permissions": [],
+      "enabled_extensions": [
+        "command.uivoid"
+      ],
+      "expected_action": "review",
+      "expected_effective_segments": [],
+      "id": "npm-exec-login-help-flag",
+      "rule_id": "command.uivoid.login"
+    },
+    {
+      "command": "npm exec uivoid@latest login -- --help",
+      "disabled_permissions": [],
+      "enabled_extensions": [
+        "command.uivoid"
+      ],
+      "expected_action": "review",
+      "expected_effective_segments": [
+        0
+      ],
+      "id": "npm-exec-login-help-operand",
+      "rule_id": "command.uivoid.login"
+    },
+    {
+      "command": "npm exec uivoid@latest login -h",
+      "disabled_permissions": [],
+      "enabled_extensions": [
+        "command.uivoid"
+      ],
+      "expected_action": "review",
+      "expected_effective_segments": [],
+      "id": "npm-exec-login-h-flag",
+      "rule_id": "command.uivoid.login"
+    },
+    {
+      "command": "npm exec uivoid@latest login -- -h",
+      "disabled_permissions": [],
+      "enabled_extensions": [
+        "command.uivoid"
+      ],
+      "expected_action": "review",
+      "expected_effective_segments": [
+        0
+      ],
+      "id": "npm-exec-login-h-operand",
+      "rule_id": "command.uivoid.login"
+    },
+    {
+      "command": "npm exec uivoid@latest skill --install --help",
+      "disabled_permissions": [],
+      "enabled_extensions": [
+        "command.uivoid"
+      ],
+      "expected_action": "review",
+      "expected_effective_segments": [],
+      "id": "npm-exec-skill-install-help-flag",
+      "rule_id": "command.uivoid.skill-install"
+    },
+    {
+      "command": "npm exec uivoid@latest skill --install -- --help",
+      "disabled_permissions": [],
+      "enabled_extensions": [
+        "command.uivoid"
+      ],
+      "expected_action": "review",
+      "expected_effective_segments": [
+        0
+      ],
+      "id": "npm-exec-skill-install-help-operand",
+      "rule_id": "command.uivoid.skill-install"
+    },
+    {
+      "command": "npm exec uivoid@latest skill --install -h",
+      "disabled_permissions": [],
+      "enabled_extensions": [
+        "command.uivoid"
+      ],
+      "expected_action": "review",
+      "expected_effective_segments": [],
+      "id": "npm-exec-skill-install-h-flag",
+      "rule_id": "command.uivoid.skill-install"
+    },
+    {
+      "command": "npm exec uivoid@latest skill --install -- -h",
+      "disabled_permissions": [],
+      "enabled_extensions": [
+        "command.uivoid"
+      ],
+      "expected_action": "review",
+      "expected_effective_segments": [
+        0
+      ],
+      "id": "npm-exec-skill-install-h-operand",
+      "rule_id": "command.uivoid.skill-install"
+    },
+    {
+      "command": "npm exec -- uivoid@latest create -- --help",
+      "disabled_permissions": [],
+      "enabled_extensions": [
+        "command.uivoid"
+      ],
+      "expected_action": "review",
+      "expected_effective_segments": [
+        0
+      ],
+      "id": "npm-exec-launcher-separator-and-help-operand",
+      "rule_id": "command.uivoid.create"
+    },
+    {
+      "command": "pnpm exec uivoid@latest create --help",
+      "disabled_permissions": [],
+      "enabled_extensions": [
+        "command.uivoid"
+      ],
+      "expected_action": "review",
+      "expected_effective_segments": [],
+      "id": "pnpm-exec-create-help-flag",
+      "rule_id": "command.uivoid.create"
+    },
+    {
+      "command": "pnpm exec uivoid@latest create -- --help",
+      "disabled_permissions": [],
+      "enabled_extensions": [
+        "command.uivoid"
+      ],
+      "expected_action": "review",
+      "expected_effective_segments": [
+        0
+      ],
+      "id": "pnpm-exec-create-help-operand",
+      "rule_id": "command.uivoid.create"
+    },
+    {
+      "command": "pnpm exec uivoid@latest create -h",
+      "disabled_permissions": [],
+      "enabled_extensions": [
+        "command.uivoid"
+      ],
+      "expected_action": "review",
+      "expected_effective_segments": [],
+      "id": "pnpm-exec-create-h-flag",
+      "rule_id": "command.uivoid.create"
+    },
+    {
+      "command": "pnpm exec uivoid@latest create -- -h",
+      "disabled_permissions": [],
+      "enabled_extensions": [
+        "command.uivoid"
+      ],
+      "expected_action": "review",
+      "expected_effective_segments": [
+        0
+      ],
+      "id": "pnpm-exec-create-h-operand",
+      "rule_id": "command.uivoid.create"
+    },
+    {
+      "command": "pnpm exec uivoid@latest credentials --help",
+      "disabled_permissions": [],
+      "enabled_extensions": [
+        "command.uivoid"
+      ],
+      "expected_action": "review",
+      "expected_effective_segments": [],
+      "id": "pnpm-exec-credentials-help-flag",
+      "rule_id": "command.uivoid.credentials"
+    },
+    {
+      "command": "pnpm exec uivoid@latest credentials -- --help",
+      "disabled_permissions": [],
+      "enabled_extensions": [
+        "command.uivoid"
+      ],
+      "expected_action": "review",
+      "expected_effective_segments": [
+        0
+      ],
+      "id": "pnpm-exec-credentials-help-operand",
+      "rule_id": "command.uivoid.credentials"
+    },
+    {
+      "command": "pnpm exec uivoid@latest credentials -h",
+      "disabled_permissions": [],
+      "enabled_extensions": [
+        "command.uivoid"
+      ],
+      "expected_action": "review",
+      "expected_effective_segments": [],
+      "id": "pnpm-exec-credentials-h-flag",
+      "rule_id": "command.uivoid.credentials"
+    },
+    {
+      "command": "pnpm exec uivoid@latest credentials -- -h",
+      "disabled_permissions": [],
+      "enabled_extensions": [
+        "command.uivoid"
+      ],
+      "expected_action": "review",
+      "expected_effective_segments": [
+        0
+      ],
+      "id": "pnpm-exec-credentials-h-operand",
+      "rule_id": "command.uivoid.credentials"
+    },
+    {
+      "command": "pnpm exec uivoid@latest oauth-config --help",
+      "disabled_permissions": [],
+      "enabled_extensions": [
+        "command.uivoid"
+      ],
+      "expected_action": "review",
+      "expected_effective_segments": [],
+      "id": "pnpm-exec-oauth-config-help-flag",
+      "rule_id": "command.uivoid.oauth-config"
+    },
+    {
+      "command": "pnpm exec uivoid@latest oauth-config -- --help",
+      "disabled_permissions": [],
+      "enabled_extensions": [
+        "command.uivoid"
+      ],
+      "expected_action": "review",
+      "expected_effective_segments": [
+        0
+      ],
+      "id": "pnpm-exec-oauth-config-help-operand",
+      "rule_id": "command.uivoid.oauth-config"
+    },
+    {
+      "command": "pnpm exec uivoid@latest oauth-config -h",
+      "disabled_permissions": [],
+      "enabled_extensions": [
+        "command.uivoid"
+      ],
+      "expected_action": "review",
+      "expected_effective_segments": [],
+      "id": "pnpm-exec-oauth-config-h-flag",
+      "rule_id": "command.uivoid.oauth-config"
+    },
+    {
+      "command": "pnpm exec uivoid@latest oauth-config -- -h",
+      "disabled_permissions": [],
+      "enabled_extensions": [
+        "command.uivoid"
+      ],
+      "expected_action": "review",
+      "expected_effective_segments": [
+        0
+      ],
+      "id": "pnpm-exec-oauth-config-h-operand",
+      "rule_id": "command.uivoid.oauth-config"
+    },
+    {
+      "command": "pnpm exec uivoid@latest login --help",
+      "disabled_permissions": [],
+      "enabled_extensions": [
+        "command.uivoid"
+      ],
+      "expected_action": "review",
+      "expected_effective_segments": [],
+      "id": "pnpm-exec-login-help-flag",
+      "rule_id": "command.uivoid.login"
+    },
+    {
+      "command": "pnpm exec uivoid@latest login -- --help",
+      "disabled_permissions": [],
+      "enabled_extensions": [
+        "command.uivoid"
+      ],
+      "expected_action": "review",
+      "expected_effective_segments": [
+        0
+      ],
+      "id": "pnpm-exec-login-help-operand",
+      "rule_id": "command.uivoid.login"
+    },
+    {
+      "command": "pnpm exec uivoid@latest login -h",
+      "disabled_permissions": [],
+      "enabled_extensions": [
+        "command.uivoid"
+      ],
+      "expected_action": "review",
+      "expected_effective_segments": [],
+      "id": "pnpm-exec-login-h-flag",
+      "rule_id": "command.uivoid.login"
+    },
+    {
+      "command": "pnpm exec uivoid@latest login -- -h",
+      "disabled_permissions": [],
+      "enabled_extensions": [
+        "command.uivoid"
+      ],
+      "expected_action": "review",
+      "expected_effective_segments": [
+        0
+      ],
+      "id": "pnpm-exec-login-h-operand",
+      "rule_id": "command.uivoid.login"
+    },
+    {
+      "command": "pnpm exec uivoid@latest skill --install --help",
+      "disabled_permissions": [],
+      "enabled_extensions": [
+        "command.uivoid"
+      ],
+      "expected_action": "review",
+      "expected_effective_segments": [],
+      "id": "pnpm-exec-skill-install-help-flag",
+      "rule_id": "command.uivoid.skill-install"
+    },
+    {
+      "command": "pnpm exec uivoid@latest skill --install -- --help",
+      "disabled_permissions": [],
+      "enabled_extensions": [
+        "command.uivoid"
+      ],
+      "expected_action": "review",
+      "expected_effective_segments": [
+        0
+      ],
+      "id": "pnpm-exec-skill-install-help-operand",
+      "rule_id": "command.uivoid.skill-install"
+    },
+    {
+      "command": "pnpm exec uivoid@latest skill --install -h",
+      "disabled_permissions": [],
+      "enabled_extensions": [
+        "command.uivoid"
+      ],
+      "expected_action": "review",
+      "expected_effective_segments": [],
+      "id": "pnpm-exec-skill-install-h-flag",
+      "rule_id": "command.uivoid.skill-install"
+    },
+    {
+      "command": "pnpm exec uivoid@latest skill --install -- -h",
+      "disabled_permissions": [],
+      "enabled_extensions": [
+        "command.uivoid"
+      ],
+      "expected_action": "review",
+      "expected_effective_segments": [
+        0
+      ],
+      "id": "pnpm-exec-skill-install-h-operand",
+      "rule_id": "command.uivoid.skill-install"
+    },
+    {
+      "command": "pnpm exec -- uivoid@latest create -- --help",
+      "disabled_permissions": [],
+      "enabled_extensions": [
+        "command.uivoid"
+      ],
+      "expected_action": "review",
+      "expected_effective_segments": [
+        0
+      ],
+      "id": "pnpm-exec-launcher-separator-and-help-operand",
+      "rule_id": "command.uivoid.create"
+    },
+    {
+      "command": "pnpm dlx uivoid@latest create --help",
+      "disabled_permissions": [],
+      "enabled_extensions": [
+        "command.uivoid"
+      ],
+      "expected_action": "review",
+      "expected_effective_segments": [],
+      "id": "pnpm-dlx-create-help-flag",
+      "rule_id": "command.uivoid.create"
+    },
+    {
+      "command": "pnpm dlx uivoid@latest create -- --help",
+      "disabled_permissions": [],
+      "enabled_extensions": [
+        "command.uivoid"
+      ],
+      "expected_action": "review",
+      "expected_effective_segments": [
+        0
+      ],
+      "id": "pnpm-dlx-create-help-operand",
+      "rule_id": "command.uivoid.create"
+    },
+    {
+      "command": "pnpm dlx uivoid@latest create -h",
+      "disabled_permissions": [],
+      "enabled_extensions": [
+        "command.uivoid"
+      ],
+      "expected_action": "review",
+      "expected_effective_segments": [],
+      "id": "pnpm-dlx-create-h-flag",
+      "rule_id": "command.uivoid.create"
+    },
+    {
+      "command": "pnpm dlx uivoid@latest create -- -h",
+      "disabled_permissions": [],
+      "enabled_extensions": [
+        "command.uivoid"
+      ],
+      "expected_action": "review",
+      "expected_effective_segments": [
+        0
+      ],
+      "id": "pnpm-dlx-create-h-operand",
+      "rule_id": "command.uivoid.create"
+    },
+    {
+      "command": "pnpm dlx uivoid@latest credentials --help",
+      "disabled_permissions": [],
+      "enabled_extensions": [
+        "command.uivoid"
+      ],
+      "expected_action": "review",
+      "expected_effective_segments": [],
+      "id": "pnpm-dlx-credentials-help-flag",
+      "rule_id": "command.uivoid.credentials"
+    },
+    {
+      "command": "pnpm dlx uivoid@latest credentials -- --help",
+      "disabled_permissions": [],
+      "enabled_extensions": [
+        "command.uivoid"
+      ],
+      "expected_action": "review",
+      "expected_effective_segments": [
+        0
+      ],
+      "id": "pnpm-dlx-credentials-help-operand",
+      "rule_id": "command.uivoid.credentials"
+    },
+    {
+      "command": "pnpm dlx uivoid@latest credentials -h",
+      "disabled_permissions": [],
+      "enabled_extensions": [
+        "command.uivoid"
+      ],
+      "expected_action": "review",
+      "expected_effective_segments": [],
+      "id": "pnpm-dlx-credentials-h-flag",
+      "rule_id": "command.uivoid.credentials"
+    },
+    {
+      "command": "pnpm dlx uivoid@latest credentials -- -h",
+      "disabled_permissions": [],
+      "enabled_extensions": [
+        "command.uivoid"
+      ],
+      "expected_action": "review",
+      "expected_effective_segments": [
+        0
+      ],
+      "id": "pnpm-dlx-credentials-h-operand",
+      "rule_id": "command.uivoid.credentials"
+    },
+    {
+      "command": "pnpm dlx uivoid@latest oauth-config --help",
+      "disabled_permissions": [],
+      "enabled_extensions": [
+        "command.uivoid"
+      ],
+      "expected_action": "review",
+      "expected_effective_segments": [],
+      "id": "pnpm-dlx-oauth-config-help-flag",
+      "rule_id": "command.uivoid.oauth-config"
+    },
+    {
+      "command": "pnpm dlx uivoid@latest oauth-config -- --help",
+      "disabled_permissions": [],
+      "enabled_extensions": [
+        "command.uivoid"
+      ],
+      "expected_action": "review",
+      "expected_effective_segments": [
+        0
+      ],
+      "id": "pnpm-dlx-oauth-config-help-operand",
+      "rule_id": "command.uivoid.oauth-config"
+    },
+    {
+      "command": "pnpm dlx uivoid@latest oauth-config -h",
+      "disabled_permissions": [],
+      "enabled_extensions": [
+        "command.uivoid"
+      ],
+      "expected_action": "review",
+      "expected_effective_segments": [],
+      "id": "pnpm-dlx-oauth-config-h-flag",
+      "rule_id": "command.uivoid.oauth-config"
+    },
+    {
+      "command": "pnpm dlx uivoid@latest oauth-config -- -h",
+      "disabled_permissions": [],
+      "enabled_extensions": [
+        "command.uivoid"
+      ],
+      "expected_action": "review",
+      "expected_effective_segments": [
+        0
+      ],
+      "id": "pnpm-dlx-oauth-config-h-operand",
+      "rule_id": "command.uivoid.oauth-config"
+    },
+    {
+      "command": "pnpm dlx uivoid@latest login --help",
+      "disabled_permissions": [],
+      "enabled_extensions": [
+        "command.uivoid"
+      ],
+      "expected_action": "review",
+      "expected_effective_segments": [],
+      "id": "pnpm-dlx-login-help-flag",
+      "rule_id": "command.uivoid.login"
+    },
+    {
+      "command": "pnpm dlx uivoid@latest login -- --help",
+      "disabled_permissions": [],
+      "enabled_extensions": [
+        "command.uivoid"
+      ],
+      "expected_action": "review",
+      "expected_effective_segments": [
+        0
+      ],
+      "id": "pnpm-dlx-login-help-operand",
+      "rule_id": "command.uivoid.login"
+    },
+    {
+      "command": "pnpm dlx uivoid@latest login -h",
+      "disabled_permissions": [],
+      "enabled_extensions": [
+        "command.uivoid"
+      ],
+      "expected_action": "review",
+      "expected_effective_segments": [],
+      "id": "pnpm-dlx-login-h-flag",
+      "rule_id": "command.uivoid.login"
+    },
+    {
+      "command": "pnpm dlx uivoid@latest login -- -h",
+      "disabled_permissions": [],
+      "enabled_extensions": [
+        "command.uivoid"
+      ],
+      "expected_action": "review",
+      "expected_effective_segments": [
+        0
+      ],
+      "id": "pnpm-dlx-login-h-operand",
+      "rule_id": "command.uivoid.login"
+    },
+    {
+      "command": "pnpm dlx uivoid@latest skill --install --help",
+      "disabled_permissions": [],
+      "enabled_extensions": [
+        "command.uivoid"
+      ],
+      "expected_action": "review",
+      "expected_effective_segments": [],
+      "id": "pnpm-dlx-skill-install-help-flag",
+      "rule_id": "command.uivoid.skill-install"
+    },
+    {
+      "command": "pnpm dlx uivoid@latest skill --install -- --help",
+      "disabled_permissions": [],
+      "enabled_extensions": [
+        "command.uivoid"
+      ],
+      "expected_action": "review",
+      "expected_effective_segments": [
+        0
+      ],
+      "id": "pnpm-dlx-skill-install-help-operand",
+      "rule_id": "command.uivoid.skill-install"
+    },
+    {
+      "command": "pnpm dlx uivoid@latest skill --install -h",
+      "disabled_permissions": [],
+      "enabled_extensions": [
+        "command.uivoid"
+      ],
+      "expected_action": "review",
+      "expected_effective_segments": [],
+      "id": "pnpm-dlx-skill-install-h-flag",
+      "rule_id": "command.uivoid.skill-install"
+    },
+    {
+      "command": "pnpm dlx uivoid@latest skill --install -- -h",
+      "disabled_permissions": [],
+      "enabled_extensions": [
+        "command.uivoid"
+      ],
+      "expected_action": "review",
+      "expected_effective_segments": [
+        0
+      ],
+      "id": "pnpm-dlx-skill-install-h-operand",
+      "rule_id": "command.uivoid.skill-install"
+    },
+    {
+      "command": "pnpm dlx -- uivoid@latest create -- --help",
+      "disabled_permissions": [],
+      "enabled_extensions": [
+        "command.uivoid"
+      ],
+      "expected_action": "review",
+      "expected_effective_segments": [
+        0
+      ],
+      "id": "pnpm-dlx-launcher-separator-and-help-operand",
+      "rule_id": "command.uivoid.create"
+    },
+    {
+      "command": "yarn dlx uivoid@latest create --help",
+      "disabled_permissions": [],
+      "enabled_extensions": [
+        "command.uivoid"
+      ],
+      "expected_action": "review",
+      "expected_effective_segments": [],
+      "id": "yarn-dlx-create-help-flag",
+      "rule_id": "command.uivoid.create"
+    },
+    {
+      "command": "yarn dlx uivoid@latest create -- --help",
+      "disabled_permissions": [],
+      "enabled_extensions": [
+        "command.uivoid"
+      ],
+      "expected_action": "review",
+      "expected_effective_segments": [
+        0
+      ],
+      "id": "yarn-dlx-create-help-operand",
+      "rule_id": "command.uivoid.create"
+    },
+    {
+      "command": "yarn dlx uivoid@latest create -h",
+      "disabled_permissions": [],
+      "enabled_extensions": [
+        "command.uivoid"
+      ],
+      "expected_action": "review",
+      "expected_effective_segments": [],
+      "id": "yarn-dlx-create-h-flag",
+      "rule_id": "command.uivoid.create"
+    },
+    {
+      "command": "yarn dlx uivoid@latest create -- -h",
+      "disabled_permissions": [],
+      "enabled_extensions": [
+        "command.uivoid"
+      ],
+      "expected_action": "review",
+      "expected_effective_segments": [
+        0
+      ],
+      "id": "yarn-dlx-create-h-operand",
+      "rule_id": "command.uivoid.create"
+    },
+    {
+      "command": "yarn dlx uivoid@latest credentials --help",
+      "disabled_permissions": [],
+      "enabled_extensions": [
+        "command.uivoid"
+      ],
+      "expected_action": "review",
+      "expected_effective_segments": [],
+      "id": "yarn-dlx-credentials-help-flag",
+      "rule_id": "command.uivoid.credentials"
+    },
+    {
+      "command": "yarn dlx uivoid@latest credentials -- --help",
+      "disabled_permissions": [],
+      "enabled_extensions": [
+        "command.uivoid"
+      ],
+      "expected_action": "review",
+      "expected_effective_segments": [
+        0
+      ],
+      "id": "yarn-dlx-credentials-help-operand",
+      "rule_id": "command.uivoid.credentials"
+    },
+    {
+      "command": "yarn dlx uivoid@latest credentials -h",
+      "disabled_permissions": [],
+      "enabled_extensions": [
+        "command.uivoid"
+      ],
+      "expected_action": "review",
+      "expected_effective_segments": [],
+      "id": "yarn-dlx-credentials-h-flag",
+      "rule_id": "command.uivoid.credentials"
+    },
+    {
+      "command": "yarn dlx uivoid@latest credentials -- -h",
+      "disabled_permissions": [],
+      "enabled_extensions": [
+        "command.uivoid"
+      ],
+      "expected_action": "review",
+      "expected_effective_segments": [
+        0
+      ],
+      "id": "yarn-dlx-credentials-h-operand",
+      "rule_id": "command.uivoid.credentials"
+    },
+    {
+      "command": "yarn dlx uivoid@latest oauth-config --help",
+      "disabled_permissions": [],
+      "enabled_extensions": [
+        "command.uivoid"
+      ],
+      "expected_action": "review",
+      "expected_effective_segments": [],
+      "id": "yarn-dlx-oauth-config-help-flag",
+      "rule_id": "command.uivoid.oauth-config"
+    },
+    {
+      "command": "yarn dlx uivoid@latest oauth-config -- --help",
+      "disabled_permissions": [],
+      "enabled_extensions": [
+        "command.uivoid"
+      ],
+      "expected_action": "review",
+      "expected_effective_segments": [
+        0
+      ],
+      "id": "yarn-dlx-oauth-config-help-operand",
+      "rule_id": "command.uivoid.oauth-config"
+    },
+    {
+      "command": "yarn dlx uivoid@latest oauth-config -h",
+      "disabled_permissions": [],
+      "enabled_extensions": [
+        "command.uivoid"
+      ],
+      "expected_action": "review",
+      "expected_effective_segments": [],
+      "id": "yarn-dlx-oauth-config-h-flag",
+      "rule_id": "command.uivoid.oauth-config"
+    },
+    {
+      "command": "yarn dlx uivoid@latest oauth-config -- -h",
+      "disabled_permissions": [],
+      "enabled_extensions": [
+        "command.uivoid"
+      ],
+      "expected_action": "review",
+      "expected_effective_segments": [
+        0
+      ],
+      "id": "yarn-dlx-oauth-config-h-operand",
+      "rule_id": "command.uivoid.oauth-config"
+    },
+    {
+      "command": "yarn dlx uivoid@latest login --help",
+      "disabled_permissions": [],
+      "enabled_extensions": [
+        "command.uivoid"
+      ],
+      "expected_action": "review",
+      "expected_effective_segments": [],
+      "id": "yarn-dlx-login-help-flag",
+      "rule_id": "command.uivoid.login"
+    },
+    {
+      "command": "yarn dlx uivoid@latest login -- --help",
+      "disabled_permissions": [],
+      "enabled_extensions": [
+        "command.uivoid"
+      ],
+      "expected_action": "review",
+      "expected_effective_segments": [
+        0
+      ],
+      "id": "yarn-dlx-login-help-operand",
+      "rule_id": "command.uivoid.login"
+    },
+    {
+      "command": "yarn dlx uivoid@latest login -h",
+      "disabled_permissions": [],
+      "enabled_extensions": [
+        "command.uivoid"
+      ],
+      "expected_action": "review",
+      "expected_effective_segments": [],
+      "id": "yarn-dlx-login-h-flag",
+      "rule_id": "command.uivoid.login"
+    },
+    {
+      "command": "yarn dlx uivoid@latest login -- -h",
+      "disabled_permissions": [],
+      "enabled_extensions": [
+        "command.uivoid"
+      ],
+      "expected_action": "review",
+      "expected_effective_segments": [
+        0
+      ],
+      "id": "yarn-dlx-login-h-operand",
+      "rule_id": "command.uivoid.login"
+    },
+    {
+      "command": "yarn dlx uivoid@latest skill --install --help",
+      "disabled_permissions": [],
+      "enabled_extensions": [
+        "command.uivoid"
+      ],
+      "expected_action": "review",
+      "expected_effective_segments": [],
+      "id": "yarn-dlx-skill-install-help-flag",
+      "rule_id": "command.uivoid.skill-install"
+    },
+    {
+      "command": "yarn dlx uivoid@latest skill --install -- --help",
+      "disabled_permissions": [],
+      "enabled_extensions": [
+        "command.uivoid"
+      ],
+      "expected_action": "review",
+      "expected_effective_segments": [
+        0
+      ],
+      "id": "yarn-dlx-skill-install-help-operand",
+      "rule_id": "command.uivoid.skill-install"
+    },
+    {
+      "command": "yarn dlx uivoid@latest skill --install -h",
+      "disabled_permissions": [],
+      "enabled_extensions": [
+        "command.uivoid"
+      ],
+      "expected_action": "review",
+      "expected_effective_segments": [],
+      "id": "yarn-dlx-skill-install-h-flag",
+      "rule_id": "command.uivoid.skill-install"
+    },
+    {
+      "command": "yarn dlx uivoid@latest skill --install -- -h",
+      "disabled_permissions": [],
+      "enabled_extensions": [
+        "command.uivoid"
+      ],
+      "expected_action": "review",
+      "expected_effective_segments": [
+        0
+      ],
+      "id": "yarn-dlx-skill-install-h-operand",
+      "rule_id": "command.uivoid.skill-install"
+    },
+    {
+      "command": "yarn dlx -- uivoid@latest create -- --help",
+      "disabled_permissions": [],
+      "enabled_extensions": [
+        "command.uivoid"
+      ],
+      "expected_action": "review",
+      "expected_effective_segments": [
+        0
+      ],
+      "id": "yarn-dlx-launcher-separator-and-help-operand",
+      "rule_id": "command.uivoid.create"
     }
   ],
   "schema": "guard.command-extension-fixtures.v1"

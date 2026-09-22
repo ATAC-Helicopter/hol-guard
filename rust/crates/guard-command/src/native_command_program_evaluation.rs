@@ -213,9 +213,9 @@ impl Evaluation<'_> {
 
     /// Matches a launcher executable, a package token, and a fixed
     /// subcommand suffix, tolerating an npm-style `@<version-or-tag>` suffix
-    /// on the package token. Reuses the same known-option stripping and flag
-    /// semantics as `executable()`; the only new logic is the per-token
-    /// normalization below, mirroring the Python reference implementation.
+    /// on the package token. Consume launcher options only while matching the
+    /// prefix, then inspect the untouched suffix so a command-level `--` keeps
+    /// subsequent operands from being interpreted as safety flags.
     fn versioned_package_subcommand(&self, node: &VersionedPackageSubcommandNode) -> MatchResult {
         let mut prefix: Vec<String> =
             Vec::with_capacity(node.leading_subcommands.len() + 1 + node.subcommands.len());
@@ -234,25 +234,38 @@ impl Evaluation<'_> {
                 .iter()
                 .map(|value| lowercase_for_ascii_comparison(value))
                 .collect();
-            let filtered = without_options(
-                &arguments,
-                &node.interspersed_options_with_values,
-                &node.interspersed_flags,
-            );
-            let normalized: Vec<String> = filtered
-                .iter()
-                .map(|token| {
-                    if *token == node.package || token.starts_with(&package_prefix) {
-                        node.package.clone()
-                    } else {
-                        token.clone()
+            let mut argument_index = 0;
+            let mut prefix_index = 0;
+            let mut options_ended = false;
+            while argument_index < arguments.len() && prefix_index < prefix.len() {
+                let argument = &arguments[argument_index];
+                if !options_ended {
+                    if argument == "--" {
+                        options_ended = true;
+                        argument_index += 1;
+                        continue;
                     }
-                })
-                .collect();
-            if normalized.len() < prefix.len() || normalized[..prefix.len()] != prefix[..] {
+                    if let Some(advance) = known_option_advance(
+                        argument,
+                        &node.interspersed_options_with_values,
+                        &node.interspersed_flags,
+                    ) {
+                        argument_index += advance;
+                        continue;
+                    }
+                }
+                let is_package = prefix_index == node.leading_subcommands.len()
+                    && argument.starts_with(&package_prefix);
+                if !is_package && argument != &prefix[prefix_index] {
+                    break;
+                }
+                argument_index += 1;
+                prefix_index += 1;
+            }
+            if prefix_index != prefix.len() {
                 continue;
             }
-            let flag_arguments = &normalized[prefix.len()..];
+            let flag_arguments = &arguments[argument_index..];
             let semantics = argument_semantics(
                 flag_arguments,
                 &node.interspersed_options_with_values,
