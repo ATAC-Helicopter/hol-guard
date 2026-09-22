@@ -46,7 +46,6 @@ BULLETED_SECTIONS = {"feat", "fix"}
 MAX_SUMMARY_BULLETS = 3
 MAX_BULLET_CHARS = 220
 MAX_RENDERED_CHANGES = 80
-RELEASE_LOOKUP_MAX_PAGES = 5
 
 
 @dataclass
@@ -180,73 +179,45 @@ def select_previous_tag(tags: Iterable[str], current_version: str, channel: str)
     return max(candidates)[1] if candidates else None
 
 
-def fetch_published_releases(
-    repo: str, max_pages: int = RELEASE_LOOKUP_MAX_PAGES
-) -> list[dict] | None:
-    """Best-effort published-release lookup via the GitHub CLI.
+def resolve_previous_release(repo: str, tag: str) -> "PreviousRelease":
+    """Authoritative per-tag lookup via the GitHub CLI.
 
-    Returns non-draft release objects, or ``None`` when the lookup fails for
-    any reason (missing ``gh``, timeout, HTTP error, malformed payload). Draft
-    releases are never published and are dropped here so no caller can treat
-    them as predecessors. A ``None`` result must degrade to a labelled
-    fallback, never abort the release.
+    One API call, no pagination window: asking about the specific candidate
+    tag cannot miss a published predecessor the way a capped listing scan
+    can. A tag alone is not a release, so a 404 means the tag has no
+    published release object. Any other lookup failure is ``unavailable`` so
+    publishing degrades to the labelled source comparison instead of
+    aborting.
     """
-    releases: list[dict] = []
-    for page in range(1, max_pages + 1):
-        try:
-            result = subprocess.run(
-                ["gh", "api", f"repos/{repo}/releases?per_page=100&page={page}"],
-                capture_output=True,
-                text=True,
-                timeout=30,
-            )
-        except (OSError, subprocess.TimeoutExpired):
-            return None
-        if result.returncode != 0:
-            return None
-        try:
-            payload = json.loads(result.stdout)
-        except json.JSONDecodeError:
-            return None
-        if not isinstance(payload, list):
-            return None
-        for release in payload:
-            if (
-                isinstance(release, dict)
-                and release.get("draft") is not True
-                and release.get("tag_name")
-            ):
-                releases.append(release)
-        if len(payload) < 100:
-            break
-    return releases
-
-
-def select_previous_release(
-    releases: Iterable[dict], current_version: str, channel: str
-) -> str | None:
-    """Pick the closest same-channel published release strictly below ``current_version``.
-
-    Mirrors :func:`select_previous_tag` but over actual release objects, so a
-    tag without a release object (for example a reserved ``v3.0.191`` tag) is
-    never returned and never linked. Draft releases are skipped as well: a
-    draft is not a published release.
-    """
-    pattern = STABLE_TAG_PATTERN if channel == "stable" else ALPHA_TAG_PATTERN
-    current = version_sort_key(current_version)
-    if current is None:
-        return None
-    candidates = []
-    for release in releases:
-        if not isinstance(release, dict) or release.get("draft") is True:
-            continue
-        tag_name = str(release.get("tag_name") or "")
-        if not pattern.match(tag_name):
-            continue
-        key = parse_version_tag(tag_name)
-        if key is not None and key < current:
-            candidates.append((key, tag_name))
-    return max(candidates)[1] if candidates else None
+    try:
+        result = subprocess.run(
+            ["gh", "api", f"repos/{repo}/releases/tags/{tag}"],
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return PreviousRelease(status="unavailable")
+    if result.returncode != 0:
+        stderr = result.stderr or ""
+        if "404" in stderr:
+            return PreviousRelease(status="unpublished")
+        return PreviousRelease(status="unavailable")
+    try:
+        payload = json.loads(result.stdout)
+    except json.JSONDecodeError:
+        return PreviousRelease(status="unavailable")
+    if (
+        isinstance(payload, dict)
+        and payload.get("tag_name") == tag
+        and payload.get("draft") is not True
+    ):
+        return PreviousRelease(
+            status="published",
+            tag=tag,
+            url=f"https://github.com/{repo}/releases/tag/{tag}",
+        )
+    return PreviousRelease(status="unpublished")
 
 
 def extract_summary_bullets(body: str | None, limit: int = MAX_SUMMARY_BULLETS) -> list[str]:
@@ -639,19 +610,7 @@ def main() -> int:
     # website availability never becomes a dependency of software publishing.
     previous_release: PreviousRelease | None = None
     if previous_tag is not None:
-        releases = fetch_published_releases(repo)
-        if releases is None:
-            previous_release = PreviousRelease(status="unavailable")
-        else:
-            published_tag = select_previous_release(releases, args.version, args.channel)
-            if published_tag == previous_tag:
-                previous_release = PreviousRelease(
-                    status="published",
-                    tag=published_tag,
-                    url=f"https://github.com/{repo}/releases/tag/{published_tag}",
-                )
-            else:
-                previous_release = PreviousRelease(status="unpublished")
+        previous_release = resolve_previous_release(repo, previous_tag)
 
     changes = load_changes(args.end_ref or source_sha, previous_tag)
     if not args.skip_pr_metadata:

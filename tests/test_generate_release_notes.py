@@ -10,13 +10,12 @@ from scripts.ci.generate_release_notes import (
     PreviousRelease,
     enrich_with_pull_requests,
     extract_summary_bullets,
-    fetch_published_releases,
     human_contributors,
     load_changes,
     main,
     parse_subject,
     render_notes,
-    select_previous_release,
+    resolve_previous_release,
     select_previous_tag,
     split_pr_suffix,
     version_sort_key,
@@ -450,57 +449,54 @@ def test_render_notes_lookup_failure_degrades_to_labelled_comparison() -> None:
     assert "**Full changelog**" not in notes
 
 
-def test_select_previous_release_skips_drafts_and_other_channels() -> None:
-    releases = [
-        {"tag_name": "v3.0.192", "draft": True},
-        {"tag_name": "v3.0.191", "draft": False},
-        {"tag_name": "alpha/v3.0.0a290", "draft": False},
-    ]
-    assert select_previous_release(releases, "3.0.193", "stable") == "v3.0.191"
-    assert select_previous_release([{"tag_name": "v3.0.192", "draft": True}], "3.0.193", "stable") is None
-    assert select_previous_release(releases, "3.0.0a291", "alpha") == "alpha/v3.0.0a290"
-
-
-def test_fetch_published_releases_filters_drafts_and_fails_open(monkeypatch) -> None:
-    payload = [
-        {"tag_name": "v3.0.192", "draft": True},
-        {"tag_name": "v3.0.191", "draft": False},
-        {"tag_name": "v3.0.190", "draft": False},
-    ]
-
-    class FakeResult:
+def test_resolve_previous_release_published_unpublished_unavailable(monkeypatch) -> None:
+    class Ok:
         returncode = 0
-        stdout = json.dumps(payload)
+        stdout = json.dumps({"tag_name": "v3.0.191", "draft": False})
         stderr = ""
 
     monkeypatch.setattr(
-        "scripts.ci.generate_release_notes.subprocess.run",
-        lambda *args, **kwargs: FakeResult(),
+        "scripts.ci.generate_release_notes.subprocess.run", lambda *a, **k: Ok()
     )
-    assert fetch_published_releases(REPO) == [
-        {"tag_name": "v3.0.191", "draft": False},
-        {"tag_name": "v3.0.190", "draft": False},
-    ]
+    resolved = resolve_previous_release(REPO, "v3.0.191")
+    assert resolved.status == "published"
+    assert resolved.url == "https://github.com/hashgraph-online/hol-guard/releases/tag/v3.0.191"
 
-    class FailedResult:
+    class NotFound:
         returncode = 1
         stdout = ""
-        stderr = "API error"
+        stderr = "gh: Not Found (HTTP 404)"
 
     monkeypatch.setattr(
-        "scripts.ci.generate_release_notes.subprocess.run",
-        lambda *args, **kwargs: FailedResult(),
+        "scripts.ci.generate_release_notes.subprocess.run", lambda *a, **k: NotFound()
     )
-    assert fetch_published_releases(REPO) is None
+    assert resolve_previous_release(REPO, "v3.0.191").status == "unpublished"
 
-    def explode(*args, **kwargs):
+    class ServerError:
+        returncode = 1
+        stdout = ""
+        stderr = "gh: Server Error (HTTP 500)"
+
+    monkeypatch.setattr(
+        "scripts.ci.generate_release_notes.subprocess.run", lambda *a, **k: ServerError()
+    )
+    assert resolve_previous_release(REPO, "v3.0.191").status == "unavailable"
+
+    class Draft:
+        returncode = 0
+        stdout = json.dumps({"tag_name": "v3.0.191", "draft": True})
+        stderr = ""
+
+    monkeypatch.setattr(
+        "scripts.ci.generate_release_notes.subprocess.run", lambda *a, **k: Draft()
+    )
+    assert resolve_previous_release(REPO, "v3.0.191").status == "unpublished"
+
+    def explode(*a, **k):
         raise subprocess.TimeoutExpired(cmd="gh", timeout=30)
 
-    monkeypatch.setattr(
-        "scripts.ci.generate_release_notes.subprocess.run",
-        explode,
-    )
-    assert fetch_published_releases(REPO) is None
+    monkeypatch.setattr("scripts.ci.generate_release_notes.subprocess.run", explode)
+    assert resolve_previous_release(REPO, "v3.0.191").status == "unavailable"
 
 
 def test_main_degrades_to_labelled_comparison_when_release_lookup_fails(
@@ -521,8 +517,8 @@ def test_main_degrades_to_labelled_comparison_when_release_lookup_fails(
 
     monkeypatch.chdir(repo)
     monkeypatch.setattr(
-        "scripts.ci.generate_release_notes.fetch_published_releases",
-        lambda repo, max_pages=5: None,
+        "scripts.ci.generate_release_notes.resolve_previous_release",
+        lambda repo, tag: PreviousRelease(status="unavailable"),
     )
     monkeypatch.setattr(
         "sys.argv",
@@ -574,11 +570,8 @@ def test_main_links_no_release_when_tag_exists_without_release_object(
 
     monkeypatch.chdir(repo)
     monkeypatch.setattr(
-        "scripts.ci.generate_release_notes.fetch_published_releases",
-        lambda repo, max_pages=5: [
-            {"tag_name": "v3.0.192", "draft": True},
-            {"tag_name": "v3.0.190", "draft": False},
-        ],
+        "scripts.ci.generate_release_notes.resolve_previous_release",
+        lambda repo, tag: PreviousRelease(status="unpublished"),
     )
     monkeypatch.setattr(
         "sys.argv",
