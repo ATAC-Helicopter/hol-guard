@@ -16,21 +16,6 @@ _FIXTURE_PATH = ROOT / "tests/fixtures/command-source-uivoid.v1.json"
 _COMPILER_ENV = "HOL_GUARD_NATIVE_TEST_SOURCE_COMPILER"
 
 
-def _build_request() -> dict[str, object]:
-    source_paths = [
-        path
-        for path in sorted((ROOT / "contributions/command-sources").glob("*.json"))
-        if path.name != "migration-manifest.json"
-    ]
-    mcp_paths = sorted((ROOT / "contributions/mcp-servers").glob("*.json"))
-    return {
-        "schema": "guard.command-extension-build.v1",
-        "sources": [json.loads(path.read_text()) for path in source_paths],
-        "mcp_sources": [json.loads(path.read_text()) for path in mcp_paths],
-        "trust": json.loads((ROOT / "contracts/extensions/trust-class-map.v1.json").read_text()),
-    }
-
-
 def _run_fixtures(request: dict[str, object]) -> dict[str, object]:
     compiler = _resolve_native_binary(_COMPILER_ENV, "guard-command-source")
     if compiler is None:
@@ -59,12 +44,30 @@ def test_uivoid_source_is_present_and_declares_its_action_classes() -> None:
     }
 
 
+def test_uivoid_portable_fixture_binds_canonical_sources() -> None:
+    fixture = json.loads(_FIXTURE_PATH.read_text())
+    assert fixture["schema"] == "guard.command-extension-fixtures.v1"
+    assert _FIXTURE_PATH.stat().st_size <= 1_048_576
+    build = fixture["build"]
+    assert build["schema"] == "guard.command-extension-build.v1"
+    sources = build["sources"]
+    ids = [source["extension"]["extension_id"] for source in sources]
+    assert "command.uivoid" in ids
+    assert len(ids) == len(set(ids))
+    # Native admission also requires the canonical compatibility-rule inventory.
+    for source, extension_id in zip(sources, ids, strict=True):
+        canonical = ROOT / "contributions/command-sources" / f"{extension_id}.json"
+        assert source == json.loads(canonical.read_text())
+    assert build["trust"] == json.loads((ROOT / "contracts/extensions/trust-class-map.v1.json").read_text())
+
+
 def test_uivoid_behavior_fixtures_pass_against_the_native_evaluator() -> None:
     """Runs the fixture cases (versioned-package matching included) through the
     real compiled catalog via `guard-command-source test`."""
 
     fixture = json.loads(_FIXTURE_PATH.read_text())
-    request = {"schema": fixture["schema"], "build": _build_request(), "cases": fixture["cases"]}
-    result = _run_fixtures(request)
+    result = _run_fixtures(fixture)
+    assert result["target_commands_executed"] == 0
+    assert len(result["cases"]) == len(fixture["cases"])
     failures = [case for case in result.get("cases", []) if not case["passed"]]
     assert result.get("ok") is True, f"{len(failures)} fixture case(s) failed: {failures[:5]}"
