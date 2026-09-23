@@ -41,14 +41,21 @@ test "$WHEEL_COUNT" -eq 1
 test -f "$WHEEL"
 BUNDLE="$TRUST_ASSETS/hol-guard-v${CORE_VERSION}.intoto.jsonl"
 test -s "$BUNDLE"
-gh attestation verify "$WHEEL" \
-  --repo "$GITHUB_REPOSITORY" \
-  --bundle "$BUNDLE" \
-  --signer-workflow "$GITHUB_REPOSITORY/.github/workflows/publish.yml" \
-  --signer-digest "$SOURCE_SHA" \
-  --source-digest "$SOURCE_SHA" \
-  --source-ref "refs/heads/${RELEASE_BRANCH}" \
-  --deny-self-hosted-runners >/dev/null
+verify_published_wheel() {
+  local source_ref="$1"
+  gh attestation verify "$WHEEL" \
+    --repo "$GITHUB_REPOSITORY" \
+    --bundle "$BUNDLE" \
+    --signer-workflow "$GITHUB_REPOSITORY/.github/workflows/publish.yml" \
+    --signer-digest "$SOURCE_SHA" \
+    --source-digest "$SOURCE_SHA" \
+    --source-ref "$source_ref" \
+    --deny-self-hosted-runners >/dev/null
+}
+# Release Please attests the tag. A manual stable dispatch attests main.
+if ! verify_published_wheel "refs/tags/${CORE_TAG}"; then
+  verify_published_wheel "refs/heads/${RELEASE_BRANCH}"
+fi
 cp "$WHEEL" "$RUNNER_TEMP/attested-macos-arm64.whl"
 test -f "$RUNNER_TEMP/attested-macos-arm64.whl"
 echo "sha=$SOURCE_SHA" >> "$GITHUB_OUTPUT"

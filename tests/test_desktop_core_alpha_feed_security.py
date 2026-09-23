@@ -108,7 +108,14 @@ def test_privileged_feed_is_main_bound_and_pins_candidate_provenance() -> None:
     assert "merge-base --is-ancestor" in provenance
     assert '--signer-workflow "$GITHUB_REPOSITORY/.github/workflows/publish.yml"' in provenance
     assert '--signer-digest "$SOURCE_SHA"' in provenance
-    assert '--source-ref "refs/heads/${RELEASE_BRANCH}"' in provenance
+    assert '--source-ref "$source_ref"' in provenance
+    assert 'verify_published_wheel "refs/tags/${CORE_TAG}"' in provenance
+    assert 'verify_published_wheel "refs/heads/${RELEASE_BRANCH}"' in provenance
+    linux = linux_workflow_text()
+    assert '--source-ref "$source_ref"' in linux
+    assert 'verify_published_wheel "refs/tags/${CORE_TAG}"' in linux
+    assert 'verify_published_wheel "refs/heads/${RELEASE_BRANCH}"' in linux
+    assert "merge-base --is-ancestor" in linux
     assert "--deny-self-hosted-runners" in provenance
 
 
