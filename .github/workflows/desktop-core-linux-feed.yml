@@ -94,7 +94,7 @@ jobs:
           test -z "$(git status --porcelain)"
       - name: Verify runner architecture
         run: test "$(uname -m)" = "x86_64"
-      - name: Discover newest published stable Core 3.x release
+      - name: Discover newest published stable Core release
         id: release
         env:
           GH_TOKEN: ${{ github.token }}
@@ -112,7 +112,7 @@ jobs:
           python3 -I scripts/release/desktop_core_alpha_feed.py discover-release "${ARGS[@]}" >> "$GITHUB_OUTPUT"
       - name: Stop when no stable Core release is published
         if: steps.release.outputs.available != 'true'
-        run: echo "No published stable HOL Guard Core 3.x release is available yet."
+        run: echo "No published stable HOL Guard Core release is available yet."
       - name: Authorize exact Core source with release provenance
         if: steps.release.outputs.available == 'true'
         id: source
