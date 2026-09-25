@@ -289,7 +289,7 @@ def _attach_native_review_approval_aliases(
 
 def _native_review_permission_decision(harness: str) -> str:
     canonical = _canonical_hook_harness(harness)
-    if canonical in {"codex", "kimi", "grok", "zcode", "hermes"}:
+    if canonical in {"codex", "kimi", "grok", "zcode", "hermes", "devin"}:
         return "deny"
     return "ask"
 
@@ -298,8 +298,24 @@ def harness_json_from_native_post_tool(
     harness: str,
     response: Mapping[str, object],
 ) -> dict[str, object]:
-    if _canonical_hook_harness(harness) in {"pi", "omp"}:
+    canonical_harness = _canonical_hook_harness(harness)
+    if canonical_harness in {"pi", "omp"}:
         return dict(response)
+    if canonical_harness == "cline":
+        # The managed AgentPlugin can replace the model-visible result. Keep
+        # Rust's reviewed-output directive and digest intact for that seam;
+        # the native Cline hook itself remains observation-only.
+        return {
+            key: response[key]
+            for key in (
+                "decision",
+                "model_output_action",
+                "reviewed_output_sha256",
+                "reviewed_excerpt",
+                "policy_action",
+            )
+            if key in response
+        }
     if response.get("decision") == "allow" and response.get("model_output_action") == "allow_original":
         action = response.get("policy_action")
         if action not in {"allow", "warn"}:

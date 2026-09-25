@@ -57,6 +57,7 @@ def test_parallel_macos_proofs_use_this_runs_matching_platform_wheel() -> None:
 
 
 def test_macos_cross_build_keeps_native_platform_proofs_and_cache_isolation() -> None:
+    """Keep Intel cross-compilation separate from native platform qualification."""
     jobs = _workflow("native-wheel-ci.yml")["jobs"]
     build = jobs["macos-build"]
     build_targets = {item["target"]: item["runner"] for item in build["strategy"]["matrix"]["include"]}
@@ -65,7 +66,8 @@ def test_macos_cross_build_keeps_native_platform_proofs_and_cache_isolation() ->
     assert proof_targets == {"x86_64-apple-darwin": "macos-15-intel", "aarch64-apple-darwin": "macos-15"}
     setup = next(step for step in build["steps"] if step.get("uses") == "./.github/actions/setup-rust")
     assert setup["with"]["targets"] == "${{ matrix.target == 'x86_64-apple-darwin' && matrix.target || '' }}"
-    commands = "\n".join(step.get("run", "") for step in build["steps"])
+    commands = (ROOT / "scripts/ci/build-native-wheel-macos.sh").read_text(encoding="utf-8")
+    assert any(step.get("run") == "bash scripts/ci/build-native-wheel-macos.sh" for step in build["steps"])
     assert '--target "$TARGET"' in commands
     assert 'target_dir="$target_dir/$TARGET"' in commands
     assert "--locked --release" in commands
@@ -78,6 +80,7 @@ def test_macos_cross_build_keeps_native_platform_proofs_and_cache_isolation() ->
 @pytest.mark.parametrize("target", ["x86_64-apple-darwin", "aarch64-apple-darwin"])
 @pytest.mark.parametrize("failed_stage", ["cargo", "self-test", "capabilities"])
 def test_macos_build_failures_stop_before_packaging(tmp_path: Path, target: str, failed_stage: str) -> None:
+    """Run the workflow's build command and reject each failed native build stage."""
     job = _workflow("native-wheel-ci.yml")["jobs"]["macos-build"]
     commands = next(step["run"] for step in job["steps"] if step.get("name", "").startswith("Build and assemble"))
     (tmp_path / "pyproject.toml").write_text('[project]\nversion="1.2.3"\n', encoding="utf-8")
@@ -102,6 +105,11 @@ def test_macos_build_failures_stop_before_packaging(tmp_path: Path, target: str,
     runtime.chmod(0o755)
     scripts = tmp_path / "scripts"
     scripts.mkdir()
+    build_helper = scripts / "ci/build-native-wheel-macos.sh"
+    build_helper.parent.mkdir()
+    build_helper.write_text(
+        (ROOT / "scripts/ci/build-native-wheel-macos.sh").read_text(encoding="utf-8"), encoding="utf-8"
+    )
     (scripts / "build_native_hol_guard_wheel.py").write_text(
         'from pathlib import Path\nPath("packaged").touch()\n', encoding="utf-8"
     )
@@ -198,7 +206,26 @@ def test_parallel_windows_workspace_checks_remain_required(name: str, integratio
     integration_commands = "\n".join(step.get("run", "") for step in integration["steps"])
     assert "cargo build --manifest-path rust/Cargo.toml --locked --release -p hol-guard-runtime" in integration_commands
     if name == "rust-runtime-windows-resident.yml":
-        assert "test_guard_native_runtime_windows_resident.py" in integration_commands
+        assert "test_native_managed_resident.py" in integration_commands
     else:
         assert "test_native_hook_client.py" in integration_commands
         assert "test_native_hook_client_transport.py" in integration_commands
+
+
+@pytest.mark.parametrize(
+    "name",
+    [
+        "rust-runtime-differential.yml",
+        "rust-runtime-mutation-differential.yml",
+        "rust-runtime-recovery.yml",
+        "rust-runtime-windows-resident.yml",
+        "rust-command-shadow.yml",
+        "rust-runtime.yml",
+        "rust-runtime-performance.yml",
+    ],
+)
+@pytest.mark.parametrize("event", ["pull_request", "push"])
+def test_production_resident_stream_selects_runtime_qualification(name: str, event: str) -> None:
+    # BaseLoader preserves the YAML `on` key rather than interpreting it as a boolean.
+    workflow = yaml.load((ROOT / ".github/workflows" / name).read_text(encoding="utf-8"), Loader=yaml.BaseLoader)
+    assert "src/codex_plugin_scanner/guard/native_resident_stream.py" in workflow["on"][event]["paths"]

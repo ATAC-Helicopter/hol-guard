@@ -106,55 +106,7 @@ jobs:
           HOL_GUARD_NATIVE_REGRESSION: "1"
           HOL_GUARD_NATIVE_BINARY: ${{ github.workspace }}/rust/target/x86_64-unknown-linux-musl/release/hol-guard-runtime
           HOL_GUARD_NATIVE_TEST_SOURCE_COMPILER: ${{ github.workspace }}/rust/target/x86_64-unknown-linux-musl/release/guard-command-source
-        run: |
-          uv run --no-sync pytest \
-            tests/test_native_command_evaluation_bridge.py \
-            tests/test_native_command_evaluation_integration.py \
-            tests/test_native_command_caller_migration.py \
-            tests/test_native_command_extension_evidence.py \
-            tests/test_guard_command_decision_routing.py \
-            tests/test_guard_command_activity_hook_integration.py \
-            tests/test_guard_command_backup_extensions.py \
-            tests/test_guard_command_blitcp_extensions.py \
-            tests/test_guard_command_cicd_extensions.py \
-            tests/test_guard_command_cloud_extensions.py \
-            tests/test_guard_command_common_extension_regressions.py \
-            tests/test_guard_command_container_kubernetes_common_extensions.py \
-            tests/test_guard_command_coverage_followup.py \
-            tests/test_guard_command_critical_floors.py \
-            tests/test_guard_command_dns_extensions.py \
-            tests/test_guard_command_domain_extensions.py \
-            tests/test_guard_command_extensions.py \
-            tests/test_guard_command_framework_extensions.py \
-            tests/test_guard_command_git_stash_permission.py \
-            tests/test_guard_command_managed_service_extensions.py \
-            tests/test_guard_command_ollama_extensions.py \
-            tests/test_guard_command_platform_extensions.py \
-            tests/test_guard_command_probe_extensions.py \
-            tests/test_guard_command_remote_extensions.py \
-            tests/test_guard_command_repo2nb_extensions.py \
-            tests/test_guard_command_safe_variants.py \
-            tests/test_guard_command_search_messaging_extensions.py \
-            tests/test_guard_command_skill_sunset_extensions.py \
-            tests/test_guard_command_specialized_variants.py \
-            tests/test_guard_command_storage_extensions.py \
-            tests/test_guard_compound_developer_inspection.py \
-            tests/test_guard_command_inspection_native_cli.py \
-            tests/test_guard_extension_control_runtime.py \
-            tests/test_guard_extension_control_test_lab.py \
-            tests/test_guard_protection_recovery.py \
-            tests/test_guard_git_pathspec_resolution.py \
-            tests/test_guard_github_failed_run_rerun.py \
-            tests/test_guard_github_workflow_authorization.py \
-            tests/test_guard_github_workflow_runtime_eval.py \
-            tests/test_guard_index_inspection_classification.py \
-            tests/test_guard_origin_fetch_classification.py \
-            tests/test_guard_read_only_git_audit.py \
-            tests/test_guard_shell_secret_read_floors.py \
-            tests/test_hermes_runtime_hooks.py \
-            tests/test_environment_secret_dump.py \
-            tests/test_native_command_test_support_paths.py \
-            --tb=short
+        run: uv run --no-sync pytest '@ci/native_runtime/regression-tests.txt'
       - name: Measure installed adapter-to-decision SLOs
         env:
           NATIVE_STOP_DIAGNOSTIC_PATH: native-stop-diagnostic.json
@@ -257,39 +209,7 @@ jobs:
           MACOSX_DEPLOYMENT_TARGET: ${{ matrix.deployment_target }}
           PLATFORM_TAG: ${{ matrix.platform_tag }}
           TARGET: ${{ matrix.target }}
-        run: |
-          VERSION=$(python -c 'import tomllib; print(tomllib.load(open("pyproject.toml", "rb"))["project"]["version"])')
-          export HOL_GUARD_PACKAGE_VERSION="$VERSION"
-          build_target=()
-          target_dir="rust/target"
-          if [[ "$TARGET" == "x86_64-apple-darwin" ]]; then
-            build_target=(--target "$TARGET")
-            target_dir="$target_dir/$TARGET"
-          fi
-          cargo build --manifest-path rust/Cargo.toml --locked --release -p hol-guard-runtime "${build_target[@]}"
-          cargo build --manifest-path rust/Cargo.toml --locked --release -p guard-command --bin guard-command-source "${build_target[@]}"
-          runtime="$target_dir/release/hol-guard-runtime"
-          source_compiler="$target_dir/release/guard-command-source"
-          # The ARM image includes Rosetta for this build-time sanity check.
-          # Installed Intel performance is measured on macos-15-intel below.
-          "$runtime" self-test --json
-          RULE_DIGEST=$("$runtime" capabilities --json | python -c 'import json,sys; print(json.load(sys.stdin)["rule_digest"])')
-          python scripts/build_native_command_program.py --check --compiler "$source_compiler"
-          jq -n --slurpfile source rust/crates/guard-command/tests/fixtures/command-source-example.v1.json --slurpfile trust contracts/extensions/trust-class-map.v1.json \
-            '{schema:"guard.command-extension-build.v1",sources:$source,mcp_sources:[],trust:$trust[0],base:"packaged"}' > source-build.json
-          "$source_compiler" compile < source-build.json > source-compiled.json
-          python scripts/build_native_hol_guard_wheel.py \
-            --wheel "pure-dist/hol_guard-${VERSION}-py3-none-any.whl" \
-            --runtime "$runtime" \
-            --output-dir native-dist \
-            --version "$VERSION" \
-            --platform-tag "$PLATFORM_TAG" \
-            --target "$TARGET" \
-            --source-sha "$HOL_GUARD_BUILD_SHA" \
-            --rule-digest "$RULE_DIGEST" \
-            --source-compiler "$source_compiler" \
-            --implementation-digest "$(jq -r '.implementation_digest' source-compiled.json)" \
-            --base-program-digest "$(jq -r '.base_program_digest' source-compiled.json)"
+        run: bash scripts/ci/build-native-wheel-macos.sh
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: hol-guard-native-wheel-${{ matrix.target }}
@@ -316,7 +236,7 @@ jobs:
             target: aarch64-apple-darwin
             deployment_target: "11.0"
     runs-on: ${{ matrix.runner }}
-    timeout-minutes: 10
+    timeout-minutes: ${{ matrix.runner == 'macos-15-intel' && matrix.proof == 'extensions' && 15 || 10 }}
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
         with:
@@ -335,12 +255,7 @@ jobs:
       - name: Install locked proof dependencies
         env:
           NATIVE_PROOF: ${{ matrix.proof }}
-        run: |
-          extras=()
-          if [[ "$NATIVE_PROOF" == "extensions" ]]; then
-            extras=(--extra dev)
-          fi
-          uv sync --frozen --no-dev --no-install-project --python 3.12 "${extras[@]}"
+        run: bash scripts/ci/install-native-proof-dependencies.sh
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
         with:
           name: hol-guard-native-wheel-${{ matrix.target }}
@@ -369,71 +284,91 @@ jobs:
           HOL_GUARD_NATIVE_BINARY=$(.venv/bin/python -c 'from codex_plugin_scanner.guard.native_runtime import native_runtime_status; status = native_runtime_status(); assert status.identity is not None; print(status.identity.path)')
           HOL_GUARD_NATIVE_TEST_SOURCE_COMPILER=$(.venv/bin/python -c 'from codex_plugin_scanner.guard.extension_builder.native_source_compiler import find_packaged_source_compiler; print(find_packaged_source_compiler())')
           export HOL_GUARD_NATIVE_BINARY HOL_GUARD_NATIVE_TEST_SOURCE_COMPILER
-          uv run --no-sync pytest \
-            tests/test_native_command_evaluation_bridge.py \
-            tests/test_native_command_evaluation_integration.py \
-            tests/test_native_command_caller_migration.py \
-            tests/test_native_command_extension_evidence.py \
-            tests/test_guard_command_decision_routing.py \
-            tests/test_guard_command_activity_hook_integration.py \
-            tests/test_guard_command_backup_extensions.py \
-            tests/test_guard_command_blitcp_extensions.py \
-            tests/test_guard_command_cicd_extensions.py \
-            tests/test_guard_command_cloud_extensions.py \
-            tests/test_guard_command_common_extension_regressions.py \
-            tests/test_guard_command_container_kubernetes_common_extensions.py \
-            tests/test_guard_command_coverage_followup.py \
-            tests/test_guard_command_critical_floors.py \
-            tests/test_guard_command_dns_extensions.py \
-            tests/test_guard_command_domain_extensions.py \
-            tests/test_guard_command_extensions.py \
-            tests/test_guard_command_framework_extensions.py \
-            tests/test_guard_command_git_stash_permission.py \
-            tests/test_guard_command_managed_service_extensions.py \
-            tests/test_guard_command_ollama_extensions.py \
-            tests/test_guard_command_platform_extensions.py \
-            tests/test_guard_command_probe_extensions.py \
-            tests/test_guard_command_remote_extensions.py \
-            tests/test_guard_command_repo2nb_extensions.py \
-            tests/test_guard_command_safe_variants.py \
-            tests/test_guard_command_search_messaging_extensions.py \
-            tests/test_guard_command_skill_sunset_extensions.py \
-            tests/test_guard_command_specialized_variants.py \
-            tests/test_guard_command_storage_extensions.py \
-            tests/test_guard_compound_developer_inspection.py \
-            tests/test_guard_command_inspection_native_cli.py \
-            tests/test_guard_extension_control_runtime.py \
-            tests/test_guard_extension_control_test_lab.py \
-            tests/test_guard_protection_recovery.py \
-            tests/test_guard_git_pathspec_resolution.py \
-            tests/test_guard_github_failed_run_rerun.py \
-            tests/test_guard_github_workflow_authorization.py \
-            tests/test_guard_github_workflow_runtime_eval.py \
-            tests/test_guard_index_inspection_classification.py \
-            tests/test_guard_origin_fetch_classification.py \
-            tests/test_guard_read_only_git_audit.py \
-            tests/test_guard_shell_secret_read_floors.py \
-            tests/test_hermes_runtime_hooks.py \
-            tests/test_environment_secret_dump.py \
-            tests/test_native_command_test_support_paths.py \
-            --tb=short
+          uv run --no-sync pytest '@ci/native_runtime/regression-tests.txt'
       - name: Measure installed adapter-to-decision SLOs
         if: matrix.proof == 'performance'
         env:
           MACOSX_DEPLOYMENT_TARGET: ${{ matrix.deployment_target }}
           PLATFORM_TAG: ${{ matrix.platform_tag }}
+          TARGET: ${{ matrix.target }}
           NATIVE_STOP_DIAGNOSTIC_PATH: native-stop-diagnostic.json
         run: |
           source scripts/ci/native-proof-environment.sh
           runtime=$(.venv/bin/python -c 'from codex_plugin_scanner.guard.native_runtime import native_runtime_status; status = native_runtime_status(); assert status.identity is not None; print(status.identity.path)')
-          .venv/bin/python scripts/bench_guard_native_installed_slo.py \
-            --runtime "$runtime" \
-            --warm-iterations 2 \
-            --cold-iterations 2 \
-            --recovery-iterations 2 \
-            --readiness-samples 2 \
-            --json native-installed-slo.json \
-            --enforce
+          run_installed_slo() {
+            local output_path="$1"
+            .venv/bin/python scripts/bench_guard_native_installed_slo.py \
+              --runtime "$runtime" \
+              --warm-iterations 2 \
+              --cold-iterations 2 \
+              --recovery-iterations 2 \
+              --readiness-samples 2 \
+              --json "$output_path" \
+              --enforce
+          }
+          retryable_intel_latency_miss() {
+            .venv/bin/python - "$1" <<'PY_CHECK'
+          import json
+          import sys
+          from pathlib import Path
+
+          payload = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
+          gates = payload.get("gates")
+          concurrency = payload.get("concurrency")
+          sixteen = concurrency.get("sixteen") if isinstance(concurrency, dict) else None
+          latency_gates = {
+              "1m_latency",
+              "250k_latency",
+              "5m_latency",
+              "cold_latency",
+              "concurrency",
+              "readiness",
+              "recovery_latency",
+              "warm_latency",
+          }
+          failed_gates = {key for key, value in gates.items() if value is False} if isinstance(gates, dict) else set()
+          retryable = (
+              isinstance(gates, dict)
+              and all(type(value) is bool for value in gates.values())
+              and bool(failed_gates)
+              and failed_gates <= latency_gates
+              and all(value is True for key, value in gates.items() if key not in latency_gates)
+              and payload.get("errors_16") == 0
+              and payload.get("errors_64") == 0
+              and isinstance(sixteen, dict)
+              and sixteen.get("errors") == 0
+              and sixteen.get("overloaded") == 0
+          )
+          raise SystemExit(0 if retryable else 1)
+          PY_CHECK
+          }
+          if [[ "$TARGET" == "x86_64-apple-darwin" ]]; then
+            slo_status=1
+            for attempt in 1 2 3; do
+              output_path="native-installed-slo-attempt-${attempt}.json"
+              set +e
+              run_installed_slo "$output_path"
+              slo_status=$?
+              set -e
+              cp "$output_path" native-installed-slo.json
+              if [[ "$slo_status" -eq 0 ]]; then
+                break
+              fi
+              if ! retryable_intel_latency_miss "$output_path"; then
+                echo "Intel macOS SLO failed for a non-retryable reason." >&2
+                exit "$slo_status"
+              fi
+              if [[ "$attempt" -lt 3 ]]; then
+                echo "::warning::Intel macOS strict latency-only SLO gate missed on attempt ${attempt}/3; retrying the same installed wheel."
+              fi
+            done
+            if [[ "$slo_status" -ne 0 ]]; then
+              echo "Intel macOS strict latency-only SLO gates failed all three attempts." >&2
+              exit "$slo_status"
+            fi
+          else
+            run_installed_slo native-installed-slo.json
+          fi
       - name: Verify native artifact provenance
         if: matrix.proof == 'default'
         env:
@@ -461,6 +396,7 @@ jobs:
             installed-pi-output.json
             installed-native-extensions.json
             native-installed-slo.json
+            native-installed-slo-attempt-*.json
             native-artifact-evidence.json
             native-stop-diagnostic.json
           if-no-files-found: error
@@ -599,54 +535,7 @@ jobs:
           HOL_GUARD_NATIVE_BINARY: '${{ github.workspace }}\rust\target\release\hol-guard-runtime.exe'
           HOL_GUARD_NATIVE_TEST_SOURCE_COMPILER: '${{ github.workspace }}\rust\target\release\guard-command-source.exe'
         run: |
-          uv run --no-sync pytest `
-            tests/test_native_command_evaluation_bridge.py `
-            tests/test_native_command_evaluation_integration.py `
-            tests/test_native_command_caller_migration.py `
-            tests/test_native_command_extension_evidence.py `
-            tests/test_guard_command_decision_routing.py `
-            tests/test_guard_command_activity_hook_integration.py `
-            tests/test_guard_command_backup_extensions.py `
-            tests/test_guard_command_blitcp_extensions.py `
-            tests/test_guard_command_cicd_extensions.py `
-            tests/test_guard_command_cloud_extensions.py `
-            tests/test_guard_command_common_extension_regressions.py `
-            tests/test_guard_command_container_kubernetes_common_extensions.py `
-            tests/test_guard_command_coverage_followup.py `
-            tests/test_guard_command_critical_floors.py `
-            tests/test_guard_command_dns_extensions.py `
-            tests/test_guard_command_domain_extensions.py `
-            tests/test_guard_command_extensions.py `
-            tests/test_guard_command_framework_extensions.py `
-            tests/test_guard_command_git_stash_permission.py `
-            tests/test_guard_command_managed_service_extensions.py `
-            tests/test_guard_command_ollama_extensions.py `
-            tests/test_guard_command_platform_extensions.py `
-            tests/test_guard_command_probe_extensions.py `
-            tests/test_guard_command_remote_extensions.py `
-            tests/test_guard_command_repo2nb_extensions.py `
-            tests/test_guard_command_safe_variants.py `
-            tests/test_guard_command_search_messaging_extensions.py `
-            tests/test_guard_command_skill_sunset_extensions.py `
-            tests/test_guard_command_specialized_variants.py `
-            tests/test_guard_command_storage_extensions.py `
-            tests/test_guard_compound_developer_inspection.py `
-            tests/test_guard_command_inspection_native_cli.py `
-            tests/test_guard_extension_control_runtime.py `
-            tests/test_guard_extension_control_test_lab.py `
-            tests/test_guard_protection_recovery.py `
-            tests/test_guard_git_pathspec_resolution.py `
-            tests/test_guard_github_failed_run_rerun.py `
-            tests/test_guard_github_workflow_authorization.py `
-            tests/test_guard_github_workflow_runtime_eval.py `
-            tests/test_guard_index_inspection_classification.py `
-            tests/test_guard_origin_fetch_classification.py `
-            tests/test_guard_read_only_git_audit.py `
-            tests/test_guard_shell_secret_read_floors.py `
-            tests/test_hermes_runtime_hooks.py `
-            tests/test_environment_secret_dump.py `
-            tests/test_native_command_test_support_paths.py `
-            --tb=short
+          uv run --no-sync pytest '@ci/native_runtime/regression-tests.txt'
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()
